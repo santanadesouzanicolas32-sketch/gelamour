@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gelamour — Painel de Pedidos</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --rosa: #E8528A;
+      --rosa-dark: #C23A6E;
+      --dourado: #D4AF37;
+      --creme: #FDF8F0;
+      --marrom: #4A2C17;
+      --texto: #2C1810;
+      --texto-sec: #6B5B52;
+      --borda: #E8E0D8;
+      --verde: #22c55e;
+      --amarelo: #f59e0b;
+      --azul: #3b82f6;
+      --vermelho: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: #f5f5f5; color: var(--texto); min-height: 100vh; }
+
+    /* HEADER */
+    .header {
+      background: linear-gradient(135deg, var(--marrom), var(--rosa-dark));
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { color: var(--dourado); font-size: 22px; font-weight: 700; }
+    .header span { color: rgba(255,255,255,0.6); font-size: 13px; }
+
+    /* CARDS DE RESUMO */
+    .resumo {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      padding: 24px 32px 0;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid var(--rosa);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    .card.verde { border-color: var(--verde); }
+    .card.amarelo { border-color: var(--amarelo); }
+    .card.azul { border-color: var(--azul); }
+    .card-label { font-size: 12px; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-valor { font-size: 28px; font-weight: 700; margin-top: 6px; }
+
+    /* FILTROS */
+    .filtros {
+      display: flex;
+      gap: 12px;
+      padding: 24px 32px 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filtros select, .filtros input {
+      padding: 8px 14px;
+      border: 1px solid var(--borda);
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--texto);
+      outline: none;
+    }
+    .filtros select:focus, .filtros input:focus { border-color: var(--rosa); }
+    .btn-refresh {
+      padding: 8px 18px;
+      background: var(--rosa);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-refresh:hover { background: var(--rosa-dark); }
+
+    /* TABELA */
+    .tabela-wrap {
+      padding: 0 32px 32px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    }
+    thead { background: var(--marrom); }
+    thead th {
+      color: #fff;
+      padding: 14px 16px;
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+    tbody tr { border-bottom: 1px solid var(--borda); transition: background 0.15s; }
+    tbody tr:hover { background: #fdf5f9; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td { padding: 14px 16px; font-size: 14px; vertical-align: top; }
+    .td-nome { font-weight: 600; }
+    .td-itens { font-size: 12px; color: var(--texto-sec); line-height: 1.6; max-width: 220px; }
+    .td-total { font-weight: 700; color: var(--rosa-dark); white-space: nowrap; }
+    .td-data { font-size: 12px; color: var(--texto-sec); white-space: nowrap; }
+
+    /* STATUS BADGE */
+    .status {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+    .status:hover { opacity: 0.8; }
+    .status.pendente { background: #fef3c7; color: #92400e; }
+    .status.confirmado { background: #d1fae5; color: #065f46; }
+    .status.entregue { background: #dbeafe; color: #1e40af; }
+    .status.cancelado { background: #fee2e2; color: #991b1b; }
+
+    /* PAGAMENTO */
+    .pag { font-size: 12px; background: #f3f4f6; padding: 3px 8px; border-radius: 6px; }
+
+    /* VAZIO */
+    .vazio { text-align: center; padding: 60px; color: var(--texto-sec); }
+    .vazio-icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* LOADING */
+    .loading { text-align: center; padding: 60px; color: var(--texto-sec); font-size: 16px; }
+
+    @media (max-width: 600px) {
+      .resumo, .filtros, .tabela-wrap { padding-left: 16px; padding-right: 16px; }
+      .header { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🍰 Gelamour — Painel de Pedidos</h1>
+  <span id="ultimaAtualizacao"></span>
+</div>
+
+<div class="resumo">
+  <div class="card">
+    <div class="card-label">Total de pedidos</div>
+    <div class="card-valor" id="totalPedidos">—</div>
+  </div>
+  <div class="card amarelo">
+    <div class="card-label">Pendentes</div>
+    <div class="card-valor" id="totalPendentes">—</div>
+  </div>
+  <div class="card verde">
+    <div class="card-label">Entregues</div>
+    <div class="card-valor" id="totalEntregues">—</div>
+  </div>
+  <div class="card azul">
+    <div class="card-label">Faturamento total</div>
+    <div class="card-valor" id="faturamento">—</div>
+  </div>
+</div>
+
+<div class="filtros">
+  <select id="filtroStatus" onchange="aplicarFiltro()">
+    <option value="">Todos os status</option>
+    <option value="pendente">Pendente</option>
+    <option value="confirmado">Confirmado</option>
+    <option value="entregue">Entregue</option>
+    <option value="cancelado">Cancelado</option>
+  </select>
+  <input type="text" id="filtroBusca" placeholder="Buscar por nome..." oninput="aplicarFiltro()">
+  <button class="btn-refresh" onclick="carregarPedidos()">↻ Atualizar</button>
+</div>
+
+<div class="tabela-wrap">
+  <div class="loading" id="loading">Carregando pedidos...</div>
+  <table id="tabela" style="display:none">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Cliente</th>
+        <th>Endereço</th>
+        <th>Itens</th>
+        <th>Total</th>
+        <th>Pagamento</th>
+        <th>Status</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="vazio" id="vazio" style="display:none">
+    <div class="vazio-icon">📭</div>
+    <div>Nenhum pedido encontrado</div>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://rfbtdtvsnftybazfmdbw.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmYnRkdHZzbmZ0eWJhemZtZGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MTAzNjAsImV4cCI6MjA5NzQ4NjM2MH0.Hw68jQFFmwLgvwF9zjhgVWPc3D1Q2pfgAn1TQlJEVu4';
+
+  let todosPedidos = [];
+
+  async function carregarPedidos() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('tabela').style.display = 'none';
+    document.getElementById('vazio').style.display = 'none';
+
+    const res = await fetch(SUPABASE_URL + '/rest/v1/pedidos?select=*&order=criado_em.desc', {
+      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
+    });
+    todosPedidos = await res.json();
+
+    atualizarResumo();
+    aplicarFiltro();
+
+    const agora = new Date().toLocaleTimeString('pt-BR');
+    document.getElementById('ultimaAtualizacao').textContent = 'Atualizado às ' + agora;
+    document.getElementById('loading').style.display = 'none';
+  }
+
+  function atualizarResumo() {
+    document.getElementById('totalPedidos').textContent = todosPedidos.length;
+    document.getElementById('totalPendentes').textContent = todosPedidos.filter(p => p.status === 'pendente').length;
+    document.getElementById('totalEntregues').textContent = todosPedidos.filter(p => p.status === 'entregue').length;
+    const fat = todosPedidos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
+    document.getElementById('faturamento').textContent = 'R$ ' + fat.toFixed(2).replace('.', ',');
+  }
+
+  function aplicarFiltro() {
+    const status = document.getElementById('filtroStatus').value;
+    const busca = document.getElementById('filtroBusca').value.toLowerCase();
+
+    let lista = todosPedidos;
+    if (status) lista = lista.filter(p => p.status === status);
+    if (busca) lista = lista.filter(p => p.nome.toLowerCase().includes(busca));
+
+    renderTabela(lista);
+  }
+
+  function renderTabela(lista) {
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+
+    if (lista.length === 0) {
+      document.getElementById('tabela').style.display = 'none';
+      document.getElementById('vazio').style.display = 'block';
+      return;
+    }
+
+    document.getElementById('tabela').style.display = 'table';
+    document.getElementById('vazio').style.display = 'none';
+
+    lista.forEach(p => {
+      const itens = Array.isArray(p.itens) ? p.itens : [];
+      const itensTexto = itens.map(i => `• ${i.nome} — R$ ${parseFloat(i.preco).toFixed(2).replace('.', ',')}`).join('\n');
+      const data = new Date(p.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>#${p.id}</strong></td>
+        <td class="td-nome">${p.nome}<br><small style="color:var(--texto-sec);font-weight:400">${p.observacao ? '📝 ' + p.observacao : ''}</small></td>
+        <td style="font-size:13px;max-width:180px">${p.endereco}</td>
+        <td class="td-itens">${itensTexto.replace(/\n/g, '<br>')}</td>
+        <td class="td-total">R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</td>
+        <td><span class="pag">${p.pagamento}</span></td>
+        <td>
+          <select class="status ${p.status}" onchange="atualizarStatus(${p.id}, this)">
+            <option value="pendente" ${p.status==='pendente'?'selected':''}>⏳ Pendente</option>
+            <option value="confirmado" ${p.status==='confirmado'?'selected':''}>✅ Confirmado</option>
+            <option value="entregue" ${p.status==='entregue'?'selected':''}>🚀 Entregue</option>
+            <option value="cancelado" ${p.status==='cancelado'?'selected':''}>❌ Cancelado</option>
+          </select>
+        </td>
+        <td class="td-data">${data}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function atualizarStatus(id, sel) {
+    const novoStatus = sel.value;
+    sel.className = 'status ' + novoStatus;
+
+    await fetch(SUPABASE_URL + '/rest/v1/pedidos?id=eq.' + id, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON,
+        'Authorization': 'Bearer ' + SUPABASE_ANON,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ status: novoStatus })
+    });
+
+    const p = todosPedidos.find(p => p.id === id);
+    if (p) p.status = novoStatus;
+    atualizarResumo();
+  }
+
+  carregarPedidos();
+  setInterval(carregarPedidos, 60000); // atualiza a cada 1 minuto
+</script>
+</body>
+</html>
