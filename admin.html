@@ -198,6 +198,7 @@
       <tr>
         <th>#</th>
         <th>Cliente</th>
+        <th>WhatsApp</th>
         <th>Endereço</th>
         <th>Itens</th>
         <th>Total</th>
@@ -309,9 +310,12 @@
 
       const tr = document.createElement('tr');
       tr.id = 'pedido-' + p.id;
+      const telFormatado = p.telefone ? p.telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3') : '—';
+      const waLink = p.telefone ? `<a href="https://wa.me/55${p.telefone}" target="_blank" style="color:var(--verde);text-decoration:none;font-size:12px">📱 ${telFormatado}</a>` : '—';
       tr.innerHTML = `
         <td><strong>#${p.id}</strong></td>
         <td class="td-nome">${p.nome}<br><small style="color:var(--texto-sec);font-weight:400">${p.observacao ? '📝 ' + p.observacao : ''}</small></td>
+        <td>${waLink}</td>
         <td style="font-size:13px;max-width:180px">${p.endereco}</td>
         <td class="td-itens">${itensTexto}</td>
         <td class="td-total">R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</td>
