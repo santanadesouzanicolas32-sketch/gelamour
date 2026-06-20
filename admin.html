@@ -260,7 +260,7 @@ function render(lista) {
     }).join('<br>');
 
     var dt = new Date(p.criado_em).toLocaleString('pt-BR',
-      {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+      {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
 
     var tel    = p.telefone||'';
     var telFmt = tel ? tel.replace(/^(\d{2})(\d{4,5})(\d{4})$/,'($1) $2-$3') : '';
