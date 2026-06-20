@@ -114,20 +114,8 @@
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="adminLogin">
-  <div class="login-box">
-    <div style="font-size:48px">🍰</div>
-    <h2>Painel Admin</h2>
-    <p>Gelamour — Área restrita</p>
-    <input type="password" id="senhaInput" placeholder="Senha de acesso" onkeydown="if(event.key==='Enter')entrarAdmin()">
-    <button onclick="entrarAdmin()">Entrar</button>
-    <div class="login-erro" id="loginErroAdmin">Senha incorreta.</div>
-  </div>
-</div>
-
 <!-- PAINEL -->
-<div id="painel" style="display:none">
+<div id="painel">
 
 <div class="header">
   <h1>🍰 Gelamour — Painel de Pedidos</h1>
@@ -204,35 +192,10 @@
 <script>
   const SUPABASE_URL  = 'https://rfbtdtvsnftybazfmdbw.supabase.co';
   const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmYnRkdHZzbmZ0eWJhemZtZGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MTAzNjAsImV4cCI6MjA5NzQ4NjM2MH0.Hw68jQFFmwLgvwF9zjhgVWPc3D1Q2pfgAn1TQlJEVu4';
-  const SENHA_ADMIN   = 'gelamour2024';
-
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   let todosPedidos = [];
 
-  /* ---- LOGIN ---- */
-  function entrarAdmin() {
-    const s = document.getElementById('senhaInput').value;
-    if (s === SENHA_ADMIN) {
-      sessionStorage.setItem('admin_ok', '1');
-      document.getElementById('adminLogin').style.display = 'none';
-      document.getElementById('painel').style.display = 'block';
-      iniciarPainel();
-    } else {
-      document.getElementById('loginErroAdmin').style.display = 'block';
-    }
-  }
-
-  function sairAdmin() {
-    sessionStorage.removeItem('admin_ok');
-    location.reload();
-  }
-
-  // Checar sessão existente
-  if (sessionStorage.getItem('admin_ok') === '1') {
-    document.getElementById('adminLogin').style.display = 'none';
-    document.getElementById('painel').style.display = 'block';
-    iniciarPainel();
-  }
+  function sairAdmin() { location.reload(); }
 
   /* ---- PAINEL ---- */
   function iniciarPainel() {
