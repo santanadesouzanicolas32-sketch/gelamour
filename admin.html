@@ -4,6 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gelamour — Painel Admin</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest-admin.json">
+  <meta name="theme-color" content="#E8528A">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Gelamour Admin">
+  <link rel="apple-touch-icon" href="icon-admin-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-admin-192.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
@@ -366,9 +376,37 @@ function notif(msg){
   else if (Notification.permission!=='denied') Notification.requestPermission();
 }
 
+/* ── SOM DE NOTIFICAÇÃO ──────────────────────────── */
+function beep() {
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.setValueAtTime(880, ctx.currentTime);
+    o.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+    g.gain.setValueAtTime(0.4, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    o.start(ctx.currentTime);
+    o.stop(ctx.currentTime + 0.4);
+  } catch(_) {}
+}
+
+// Chamar beep junto com toast de novo pedido
+var _toastOrig = toast;
+toast = function(msg) {
+  _toastOrig(msg);
+  if (msg.indexOf('Novo pedido') !== -1) beep();
+};
+
 /* ── BOOT ────────────────────────────────────────── */
-buscar();                        // carrega imediatamente
-setInterval(buscar, POLL);       // polling a cada 5 segundos
+buscar();
+setInterval(buscar, POLL);
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>
