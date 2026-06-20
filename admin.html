@@ -3,151 +3,110 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gelamour — Painel de Pedidos</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <title>Gelamour — Painel Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
-      --rosa: #E8528A;
-      --rosa-dark: #C23A6E;
-      --dourado: #D4AF37;
-      --creme: #FDF8F0;
-      --marrom: #4A2C17;
-      --texto: #2C1810;
-      --texto-sec: #6B5B52;
-      --borda: #E8E0D8;
-      --verde: #22c55e;
-      --amarelo: #f59e0b;
-      --azul: #3b82f6;
-      --vermelho: #ef4444;
+      --rosa: #E8528A; --rosa-dark: #C23A6E; --dourado: #D4AF37;
+      --marrom: #4A2C17; --texto: #2C1810; --texto-sec: #6B5B52;
+      --borda: #E8E0D8; --verde: #22c55e; --amarelo: #f59e0b;
+      --azul: #3b82f6; --vermelho: #ef4444;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'DM Sans', sans-serif; background: #f5f5f5; color: var(--texto); min-height: 100vh; }
 
+    /* LOGIN ADMIN */
+    #adminLogin {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(135deg, #4A2C17, #C23A6E);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-box {
+      background: #fff; border-radius: 20px; padding: 40px 32px;
+      width: 100%; max-width: 360px; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-box h2 { font-size: 24px; color: var(--marrom); margin: 12px 0 6px; }
+    .login-box p { color: var(--texto-sec); font-size: 14px; margin-bottom: 24px; }
+    .login-box input {
+      width: 100%; padding: 12px 16px; border: 2px solid var(--borda);
+      border-radius: 10px; font-size: 16px; outline: none;
+      margin-bottom: 12px; font-family: inherit;
+    }
+    .login-box input:focus { border-color: var(--rosa); }
+    .login-box button {
+      width: 100%; padding: 13px; background: var(--rosa); color: #fff;
+      border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .login-box button:hover { background: var(--rosa-dark); }
+    .login-erro { color: var(--vermelho); font-size: 13px; margin-top: 8px; display: none; }
+
     /* HEADER */
     .header {
       background: linear-gradient(135deg, var(--marrom), var(--rosa-dark));
-      padding: 20px 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
     }
-    .header h1 { color: var(--dourado); font-size: 22px; font-weight: 700; }
-    .header span { color: rgba(255,255,255,0.6); font-size: 13px; }
+    .header h1 { color: var(--dourado); font-size: 20px; font-weight: 700; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    #statusConexao { font-size: 13px; color: rgba(255,255,255,0.7); }
+    .btn-sair { background: rgba(255,255,255,0.15); color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    .btn-sair:hover { background: rgba(255,255,255,0.25); }
 
-    /* CARDS DE RESUMO */
-    .resumo {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      padding: 24px 32px 0;
-    }
-    .card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 20px;
-      border-left: 4px solid var(--rosa);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-    }
+    /* ERRO */
+    .erro-banner { background: #fee2e2; color: #991b1b; padding: 14px 32px; font-size: 14px; display: none; }
+
+    /* CARDS */
+    .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; padding: 24px 32px 0; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; border-left: 4px solid var(--rosa); box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
     .card.verde { border-color: var(--verde); }
     .card.amarelo { border-color: var(--amarelo); }
     .card.azul { border-color: var(--azul); }
-    .card-label { font-size: 12px; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.5px; }
-    .card-valor { font-size: 28px; font-weight: 700; margin-top: 6px; }
+    .card.vermelho { border-color: var(--vermelho); }
+    .card-label { font-size: 11px; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-valor { font-size: 26px; font-weight: 700; margin-top: 6px; }
 
     /* FILTROS */
-    .filtros {
-      display: flex;
-      gap: 12px;
-      padding: 24px 32px 16px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .filtros select, .filtros input {
-      padding: 8px 14px;
-      border: 1px solid var(--borda);
-      border-radius: 8px;
-      font-size: 14px;
-      background: #fff;
-      color: var(--texto);
-      outline: none;
-    }
+    .filtros { display: flex; gap: 10px; padding: 20px 32px 16px; flex-wrap: wrap; align-items: center; }
+    .filtros select, .filtros input { padding: 8px 14px; border: 1px solid var(--borda); border-radius: 8px; font-size: 14px; background: #fff; color: var(--texto); outline: none; font-family: inherit; }
     .filtros select:focus, .filtros input:focus { border-color: var(--rosa); }
-    .btn-refresh {
-      padding: 8px 18px;
-      background: var(--rosa);
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
+    .btn-refresh { padding: 8px 16px; background: var(--rosa); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
     .btn-refresh:hover { background: var(--rosa-dark); }
 
     /* TABELA */
-    .tabela-wrap {
-      padding: 0 32px 32px;
-      overflow-x: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-    }
+    .tabela-wrap { padding: 0 32px 40px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
     thead { background: var(--marrom); }
-    thead th {
-      color: #fff;
-      padding: 14px 16px;
-      text-align: left;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
-    }
+    thead th { color: #fff; padding: 13px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
     tbody tr { border-bottom: 1px solid var(--borda); transition: background 0.15s; }
     tbody tr:hover { background: #fdf5f9; }
     tbody tr:last-child { border-bottom: none; }
-    tbody td { padding: 14px 16px; font-size: 14px; vertical-align: top; }
-    .td-nome { font-weight: 600; }
-    .td-itens { font-size: 12px; color: var(--texto-sec); line-height: 1.6; max-width: 220px; }
+    tbody td { padding: 13px 14px; font-size: 14px; vertical-align: top; }
+    .td-nome { font-weight: 600; max-width: 140px; }
+    .td-itens { font-size: 12px; color: var(--texto-sec); line-height: 1.6; max-width: 200px; }
     .td-total { font-weight: 700; color: var(--rosa-dark); white-space: nowrap; }
     .td-data { font-size: 12px; color: var(--texto-sec); white-space: nowrap; }
 
-    /* STATUS BADGE */
-    .status {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      cursor: pointer;
-      border: none;
-      transition: opacity 0.2s;
+    /* STATUS SELECT */
+    .status-sel {
+      padding: 5px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      border: none; cursor: pointer; outline: none; font-family: inherit;
     }
-    .status:hover { opacity: 0.8; }
-    .status.pendente { background: #fef3c7; color: #92400e; }
-    .status.confirmado { background: #d1fae5; color: #065f46; }
-    .status.entregue { background: #dbeafe; color: #1e40af; }
-    .status.cancelado { background: #fee2e2; color: #991b1b; }
+    .status-sel.pendente { background: #fef3c7; color: #92400e; }
+    .status-sel.confirmado { background: #d1fae5; color: #065f46; }
+    .status-sel.entregue { background: #dbeafe; color: #1e40af; }
+    .status-sel.cancelado { background: #fee2e2; color: #991b1b; }
 
-    /* PAGAMENTO */
     .pag { font-size: 12px; background: #f3f4f6; padding: 3px 8px; border-radius: 6px; }
 
-    /* VAZIO */
+    .btn-del { background: none; border: 1px solid #fca5a5; color: var(--vermelho); border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer; }
+    .btn-del:hover { background: #fee2e2; }
+
     .vazio { text-align: center; padding: 60px; color: var(--texto-sec); }
-    .vazio-icon { font-size: 48px; margin-bottom: 12px; }
+    .loading { text-align: center; padding: 60px; color: var(--texto-sec); font-size: 15px; }
 
-    /* LOADING */
-    .loading { text-align: center; padding: 60px; color: var(--texto-sec); font-size: 16px; }
-
-    @media (max-width: 600px) {
+    @media (max-width: 640px) {
       .resumo, .filtros, .tabela-wrap { padding-left: 16px; padding-right: 16px; }
       .header { padding: 16px; }
     }
@@ -155,10 +114,30 @@
 </head>
 <body>
 
+<!-- LOGIN -->
+<div id="adminLogin">
+  <div class="login-box">
+    <div style="font-size:48px">🍰</div>
+    <h2>Painel Admin</h2>
+    <p>Gelamour — Área restrita</p>
+    <input type="password" id="senhaInput" placeholder="Senha de acesso" onkeydown="if(event.key==='Enter')entrarAdmin()">
+    <button onclick="entrarAdmin()">Entrar</button>
+    <div class="login-erro" id="loginErroAdmin">Senha incorreta.</div>
+  </div>
+</div>
+
+<!-- PAINEL -->
+<div id="painel" style="display:none">
+
 <div class="header">
   <h1>🍰 Gelamour — Painel de Pedidos</h1>
-  <span id="ultimaAtualizacao"></span>
+  <div class="header-right">
+    <span id="statusConexao">Conectando...</span>
+    <button class="btn-sair" onclick="sairAdmin()">Sair</button>
+  </div>
 </div>
+
+<div class="erro-banner" id="erroBanner"></div>
 
 <div class="resumo">
   <div class="card">
@@ -174,7 +153,11 @@
     <div class="card-valor" id="totalEntregues">—</div>
   </div>
   <div class="card azul">
-    <div class="card-label">Faturamento total</div>
+    <div class="card-label">Confirmados</div>
+    <div class="card-valor" id="totalConfirmados">—</div>
+  </div>
+  <div class="card vermelho">
+    <div class="card-label">Faturamento</div>
     <div class="card-valor" id="faturamento">—</div>
   </div>
 </div>
@@ -182,10 +165,10 @@
 <div class="filtros">
   <select id="filtroStatus" onchange="aplicarFiltro()">
     <option value="">Todos os status</option>
-    <option value="pendente">Pendente</option>
-    <option value="confirmado">Confirmado</option>
-    <option value="entregue">Entregue</option>
-    <option value="cancelado">Cancelado</option>
+    <option value="pendente">⏳ Pendente</option>
+    <option value="confirmado">✅ Confirmado</option>
+    <option value="entregue">🚀 Entregue</option>
+    <option value="cancelado">❌ Cancelado</option>
   </select>
   <input type="text" id="filtroBusca" placeholder="Buscar por nome..." oninput="aplicarFiltro()">
   <button class="btn-refresh" onclick="carregarPedidos()">↻ Atualizar</button>
@@ -205,88 +188,141 @@
         <th>Pagamento</th>
         <th>Status</th>
         <th>Data</th>
+        <th>Ação</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
   </table>
   <div class="vazio" id="vazio" style="display:none">
-    <div class="vazio-icon">📭</div>
+    <div style="font-size:48px;margin-bottom:12px">📭</div>
     <div>Nenhum pedido encontrado</div>
   </div>
 </div>
 
+</div><!-- fim #painel -->
+
 <script>
-  const SUPABASE_URL = 'https://rfbtdtvsnftybazfmdbw.supabase.co';
+  const SUPABASE_URL  = 'https://rfbtdtvsnftybazfmdbw.supabase.co';
   const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmYnRkdHZzbmZ0eWJhemZtZGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MTAzNjAsImV4cCI6MjA5NzQ4NjM2MH0.Hw68jQFFmwLgvwF9zjhgVWPc3D1Q2pfgAn1TQlJEVu4';
+  const SENHA_ADMIN   = 'gelamour2024';
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   let todosPedidos = [];
+
+  /* ---- LOGIN ---- */
+  function entrarAdmin() {
+    const s = document.getElementById('senhaInput').value;
+    if (s === SENHA_ADMIN) {
+      sessionStorage.setItem('admin_ok', '1');
+      document.getElementById('adminLogin').style.display = 'none';
+      document.getElementById('painel').style.display = 'block';
+      iniciarPainel();
+    } else {
+      document.getElementById('loginErroAdmin').style.display = 'block';
+    }
+  }
+
+  function sairAdmin() {
+    sessionStorage.removeItem('admin_ok');
+    location.reload();
+  }
+
+  // Checar sessão existente
+  if (sessionStorage.getItem('admin_ok') === '1') {
+    document.getElementById('adminLogin').style.display = 'none';
+    document.getElementById('painel').style.display = 'block';
+    iniciarPainel();
+  }
+
+  /* ---- PAINEL ---- */
+  function iniciarPainel() {
+    carregarPedidos();
+    inscreverRealtime();
+    // auto-refresh a cada 60s como fallback
+    setInterval(carregarPedidos, 60000);
+  }
+
+  function mostrarErro(msg) {
+    const b = document.getElementById('erroBanner');
+    b.textContent = '⚠️ ' + msg;
+    b.style.display = 'block';
+    setTimeout(() => b.style.display = 'none', 6000);
+  }
 
   async function carregarPedidos() {
     document.getElementById('loading').style.display = 'block';
     document.getElementById('tabela').style.display = 'none';
     document.getElementById('vazio').style.display = 'none';
 
-    const { data } = await supabase.from('pedidos').select('*').order('criado_em', { ascending: false });
-    todosPedidos = data || [];
+    const { data, error } = await supabase
+      .from('pedidos').select('*').order('criado_em', { ascending: false });
 
+    document.getElementById('loading').style.display = 'none';
+
+    if (error) {
+      mostrarErro('Erro ao carregar pedidos: ' + error.message);
+      document.getElementById('vazio').style.display = 'block';
+      return;
+    }
+
+    todosPedidos = data || [];
     atualizarResumo();
     aplicarFiltro();
-    document.getElementById('loading').style.display = 'none';
-    atualizarHora();
+    setStatus('🟢 Conectado · ' + new Date().toLocaleTimeString('pt-BR'));
   }
 
-  function atualizarHora() {
-    const agora = new Date().toLocaleTimeString('pt-BR');
-    document.getElementById('ultimaAtualizacao').textContent = '🟢 Tempo real · ' + agora;
+  function setStatus(txt) {
+    document.getElementById('statusConexao').textContent = txt;
   }
 
-  // REALTIME — ouve novos pedidos, atualizações e exclusões
-  supabase.channel('pedidos-canal')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, payload => {
-      todosPedidos.unshift(payload.new);
-      atualizarResumo();
-      aplicarFiltro();
-      notificar('🛒 Novo pedido de ' + payload.new.nome + '!');
-      atualizarHora();
-    })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, payload => {
-      const idx = todosPedidos.findIndex(p => p.id === payload.new.id);
-      if (idx !== -1) todosPedidos[idx] = payload.new;
-      atualizarResumo();
-      aplicarFiltro();
-      atualizarHora();
-    })
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pedidos' }, payload => {
-      todosPedidos = todosPedidos.filter(p => p.id !== payload.old.id);
-      atualizarResumo();
-      aplicarFiltro();
-      atualizarHora();
-    })
-    .subscribe();
+  function inscreverRealtime() {
+    supabase.channel('admin-pedidos')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, p => {
+        todosPedidos.unshift(p.new);
+        atualizarResumo(); aplicarFiltro();
+        notificar('🛒 Novo pedido de ' + p.new.nome + '!');
+        setStatus('🟢 Novo pedido · ' + new Date().toLocaleTimeString('pt-BR'));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, p => {
+        const i = todosPedidos.findIndex(x => x.id === p.new.id);
+        if (i !== -1) todosPedidos[i] = p.new;
+        atualizarResumo(); aplicarFiltro();
+        setStatus('🟢 Atualizado · ' + new Date().toLocaleTimeString('pt-BR'));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pedidos' }, p => {
+        todosPedidos = todosPedidos.filter(x => x.id !== p.old.id);
+        atualizarResumo(); aplicarFiltro();
+        setStatus('🟢 Pedido removido · ' + new Date().toLocaleTimeString('pt-BR'));
+      })
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') setStatus('🟢 Tempo real ativo');
+        if (status === 'CHANNEL_ERROR') setStatus('🔴 Erro no tempo real');
+      });
+  }
 
   function notificar(msg) {
     if (Notification.permission === 'granted') {
-      new Notification('Gelamour', { body: msg, icon: '' });
+      new Notification('Gelamour', { body: msg });
     } else if (Notification.permission !== 'denied') {
-      Notification.requestPermission().then(p => { if (p === 'granted') new Notification('Gelamour', { body: msg }); });
+      Notification.requestPermission();
     }
   }
 
   function atualizarResumo() {
-    document.getElementById('totalPedidos').textContent = todosPedidos.length;
-    document.getElementById('totalPendentes').textContent = todosPedidos.filter(p => p.status === 'pendente').length;
-    document.getElementById('totalEntregues').textContent = todosPedidos.filter(p => p.status === 'entregue').length;
+    document.getElementById('totalPedidos').textContent    = todosPedidos.length;
+    document.getElementById('totalPendentes').textContent  = todosPedidos.filter(p => p.status === 'pendente').length;
+    document.getElementById('totalEntregues').textContent  = todosPedidos.filter(p => p.status === 'entregue').length;
+    document.getElementById('totalConfirmados').textContent= todosPedidos.filter(p => p.status === 'confirmado').length;
     const fat = todosPedidos.reduce((s, p) => s + parseFloat(p.total || 0), 0);
     document.getElementById('faturamento').textContent = 'R$ ' + fat.toFixed(2).replace('.', ',');
   }
 
   function aplicarFiltro() {
     const status = document.getElementById('filtroStatus').value;
-    const busca = document.getElementById('filtroBusca').value.toLowerCase();
+    const busca  = document.getElementById('filtroBusca').value.toLowerCase();
     let lista = todosPedidos;
     if (status) lista = lista.filter(p => p.status === status);
-    if (busca) lista = lista.filter(p => p.nome.toLowerCase().includes(busca));
+    if (busca)  lista = lista.filter(p => (p.nome || '').toLowerCase().includes(busca));
     renderTabela(lista);
   }
 
@@ -305,30 +341,41 @@
 
     lista.forEach(p => {
       const itens = Array.isArray(p.itens) ? p.itens : [];
-      const itensTexto = itens.map(i => `• ${i.nome} — R$ ${parseFloat(i.preco).toFixed(2).replace('.', ',')}`).join('<br>');
-      const data = new Date(p.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const itensHTML = itens.map(i =>
+        `• ${i.nome} — R$ ${parseFloat(i.preco).toFixed(2).replace('.', ',')}`
+      ).join('<br>');
+      const dataFmt = new Date(p.criado_em).toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      const telFmt = p.telefone
+        ? p.telefone.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3')
+        : null;
+      const waLink = telFmt
+        ? `<a href="https://wa.me/55${p.telefone}" target="_blank" style="color:var(--verde);text-decoration:none;font-size:12px">📱 ${telFmt}</a>`
+        : '<span style="color:var(--texto-sec);font-size:12px">—</span>';
 
       const tr = document.createElement('tr');
-      tr.id = 'pedido-' + p.id;
-      const telFormatado = p.telefone ? p.telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3') : '—';
-      const waLink = p.telefone ? `<a href="https://wa.me/55${p.telefone}" target="_blank" style="color:var(--verde);text-decoration:none;font-size:12px">📱 ${telFormatado}</a>` : '—';
+      tr.id = 'row-' + p.id;
       tr.innerHTML = `
         <td><strong>#${p.id}</strong></td>
-        <td class="td-nome">${p.nome}<br><small style="color:var(--texto-sec);font-weight:400">${p.observacao ? '📝 ' + p.observacao : ''}</small></td>
+        <td class="td-nome">${p.nome || '—'}
+          ${p.observacao ? `<br><small style="color:var(--texto-sec);font-weight:400">📝 ${p.observacao}</small>` : ''}
+        </td>
         <td>${waLink}</td>
-        <td style="font-size:13px;max-width:180px">${p.endereco}</td>
-        <td class="td-itens">${itensTexto}</td>
-        <td class="td-total">R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</td>
-        <td><span class="pag">${p.pagamento}</span></td>
+        <td style="font-size:12px;max-width:160px">${p.endereco || '—'}</td>
+        <td class="td-itens">${itensHTML || '—'}</td>
+        <td class="td-total">R$ ${parseFloat(p.total || 0).toFixed(2).replace('.', ',')}</td>
+        <td><span class="pag">${p.pagamento || '—'}</span></td>
         <td>
-          <select class="status ${p.status}" onchange="atualizarStatus(${p.id}, this)">
-            <option value="pendente" ${p.status==='pendente'?'selected':''}>⏳ Pendente</option>
-            <option value="confirmado" ${p.status==='confirmado'?'selected':''}>✅ Confirmado</option>
-            <option value="entregue" ${p.status==='entregue'?'selected':''}>🚀 Entregue</option>
-            <option value="cancelado" ${p.status==='cancelado'?'selected':''}>❌ Cancelado</option>
+          <select class="status-sel ${p.status}" onchange="atualizarStatus(${p.id}, this)">
+            <option value="pendente"   ${p.status==='pendente'   ?'selected':''}>⏳ Pendente</option>
+            <option value="confirmado" ${p.status==='confirmado' ?'selected':''}>✅ Confirmado</option>
+            <option value="entregue"   ${p.status==='entregue'   ?'selected':''}>🚀 Entregue</option>
+            <option value="cancelado"  ${p.status==='cancelado'  ?'selected':''}>❌ Cancelado</option>
           </select>
         </td>
-        <td class="td-data">${data}</td>
+        <td class="td-data">${dataFmt}</td>
+        <td><button class="btn-del" onclick="deletarPedido(${p.id})">🗑</button></td>
       `;
       tbody.appendChild(tr);
     });
@@ -336,11 +383,22 @@
 
   async function atualizarStatus(id, sel) {
     const novoStatus = sel.value;
-    sel.className = 'status ' + novoStatus;
-    await supabase.from('pedidos').update({ status: novoStatus }).eq('id', id);
+    sel.className = 'status-sel ' + novoStatus;
+    const { error } = await supabase.from('pedidos').update({ status: novoStatus }).eq('id', id);
+    if (error) mostrarErro('Erro ao atualizar status: ' + error.message);
   }
 
-  carregarPedidos();
+  async function deletarPedido(id) {
+    if (!confirm('Remover o pedido #' + id + '?')) return;
+    const { error } = await supabase.from('pedidos').delete().eq('id', id);
+    if (error) {
+      mostrarErro('Erro ao remover pedido: ' + error.message);
+    } else {
+      todosPedidos = todosPedidos.filter(p => p.id !== id);
+      atualizarResumo();
+      aplicarFiltro();
+    }
+  }
 </script>
 </body>
 </html>
