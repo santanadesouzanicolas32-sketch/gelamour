@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gelamour — Painel de Pedidos</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --rosa: #E8528A;
@@ -217,6 +218,7 @@
   const SUPABASE_URL = 'https://rfbtdtvsnftybazfmdbw.supabase.co';
   const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmYnRkdHZzbmZ0eWJhemZtZGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MTAzNjAsImV4cCI6MjA5NzQ4NjM2MH0.Hw68jQFFmwLgvwF9zjhgVWPc3D1Q2pfgAn1TQlJEVu4';
 
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
   let todosPedidos = [];
 
   async function carregarPedidos() {
@@ -224,17 +226,50 @@
     document.getElementById('tabela').style.display = 'none';
     document.getElementById('vazio').style.display = 'none';
 
-    const res = await fetch(SUPABASE_URL + '/rest/v1/pedidos?select=*&order=criado_em.desc', {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-    });
-    todosPedidos = await res.json();
+    const { data } = await supabase.from('pedidos').select('*').order('criado_em', { ascending: false });
+    todosPedidos = data || [];
 
     atualizarResumo();
     aplicarFiltro();
-
-    const agora = new Date().toLocaleTimeString('pt-BR');
-    document.getElementById('ultimaAtualizacao').textContent = 'Atualizado às ' + agora;
     document.getElementById('loading').style.display = 'none';
+    atualizarHora();
+  }
+
+  function atualizarHora() {
+    const agora = new Date().toLocaleTimeString('pt-BR');
+    document.getElementById('ultimaAtualizacao').textContent = '🟢 Tempo real · ' + agora;
+  }
+
+  // REALTIME — ouve novos pedidos, atualizações e exclusões
+  supabase.channel('pedidos-canal')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pedidos' }, payload => {
+      todosPedidos.unshift(payload.new);
+      atualizarResumo();
+      aplicarFiltro();
+      notificar('🛒 Novo pedido de ' + payload.new.nome + '!');
+      atualizarHora();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pedidos' }, payload => {
+      const idx = todosPedidos.findIndex(p => p.id === payload.new.id);
+      if (idx !== -1) todosPedidos[idx] = payload.new;
+      atualizarResumo();
+      aplicarFiltro();
+      atualizarHora();
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'pedidos' }, payload => {
+      todosPedidos = todosPedidos.filter(p => p.id !== payload.old.id);
+      atualizarResumo();
+      aplicarFiltro();
+      atualizarHora();
+    })
+    .subscribe();
+
+  function notificar(msg) {
+    if (Notification.permission === 'granted') {
+      new Notification('Gelamour', { body: msg, icon: '' });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(p => { if (p === 'granted') new Notification('Gelamour', { body: msg }); });
+    }
   }
 
   function atualizarResumo() {
@@ -248,11 +283,9 @@
   function aplicarFiltro() {
     const status = document.getElementById('filtroStatus').value;
     const busca = document.getElementById('filtroBusca').value.toLowerCase();
-
     let lista = todosPedidos;
     if (status) lista = lista.filter(p => p.status === status);
     if (busca) lista = lista.filter(p => p.nome.toLowerCase().includes(busca));
-
     renderTabela(lista);
   }
 
@@ -271,15 +304,16 @@
 
     lista.forEach(p => {
       const itens = Array.isArray(p.itens) ? p.itens : [];
-      const itensTexto = itens.map(i => `• ${i.nome} — R$ ${parseFloat(i.preco).toFixed(2).replace('.', ',')}`).join('\n');
+      const itensTexto = itens.map(i => `• ${i.nome} — R$ ${parseFloat(i.preco).toFixed(2).replace('.', ',')}`).join('<br>');
       const data = new Date(p.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
       const tr = document.createElement('tr');
+      tr.id = 'pedido-' + p.id;
       tr.innerHTML = `
         <td><strong>#${p.id}</strong></td>
         <td class="td-nome">${p.nome}<br><small style="color:var(--texto-sec);font-weight:400">${p.observacao ? '📝 ' + p.observacao : ''}</small></td>
         <td style="font-size:13px;max-width:180px">${p.endereco}</td>
-        <td class="td-itens">${itensTexto.replace(/\n/g, '<br>')}</td>
+        <td class="td-itens">${itensTexto}</td>
         <td class="td-total">R$ ${parseFloat(p.total).toFixed(2).replace('.', ',')}</td>
         <td><span class="pag">${p.pagamento}</span></td>
         <td>
@@ -299,25 +333,10 @@
   async function atualizarStatus(id, sel) {
     const novoStatus = sel.value;
     sel.className = 'status ' + novoStatus;
-
-    await fetch(SUPABASE_URL + '/rest/v1/pedidos?id=eq.' + id, {
-      method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_ANON,
-        'Authorization': 'Bearer ' + SUPABASE_ANON,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ status: novoStatus })
-    });
-
-    const p = todosPedidos.find(p => p.id === id);
-    if (p) p.status = novoStatus;
-    atualizarResumo();
+    await supabase.from('pedidos').update({ status: novoStatus }).eq('id', id);
   }
 
   carregarPedidos();
-  setInterval(carregarPedidos, 60000); // atualiza a cada 1 minuto
 </script>
 </body>
 </html>
