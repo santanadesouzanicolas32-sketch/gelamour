@@ -16,7 +16,8 @@ serve(async (req) => {
   }
 
   try {
-    const { pedido_id, total, nome } = await req.json()
+    const { pedido_id, total, nome, billing_type } = await req.json()
+    const tipo: string = billing_type === 'CREDIT_CARD' ? 'CREDIT_CARD' : 'PIX'
 
     if (!pedido_id || !total || !nome) {
       return new Response(JSON.stringify({ error: 'Dados incompletos' }), {
@@ -25,7 +26,7 @@ serve(async (req) => {
       })
     }
 
-    // 1. Criar cliente no Asaas (nome é o único campo obrigatório)
+    // 1. Criar cliente no Asaas
     const custResp = await fetch(`${ASAAS_BASE}/customers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
@@ -33,17 +34,17 @@ serve(async (req) => {
     })
     const customer = await custResp.json()
     if (!customer.id) {
-      throw new Error('Falha ao criar cliente Asaas: ' + JSON.stringify(customer))
+      throw new Error('Falha ao criar cliente: ' + JSON.stringify(customer))
     }
 
-    // 2. Criar cobrança Pix
+    // 2. Criar cobrança (Pix ou Cartão)
     const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const payResp = await fetch(`${ASAAS_BASE}/payments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'access_token': ASAAS_API_KEY },
       body: JSON.stringify({
         customer: customer.id,
-        billingType: 'PIX',
+        billingType: tipo,
         value: total,
         dueDate,
         description: `Pedido Gelamour #${pedido_id}`,
@@ -55,13 +56,7 @@ serve(async (req) => {
       throw new Error('Falha ao criar cobrança: ' + JSON.stringify(charge))
     }
 
-    // 3. Buscar QR Code Pix
-    const pixResp = await fetch(`${ASAAS_BASE}/payments/${charge.id}/pixQrCode`, {
-      headers: { 'access_token': ASAAS_API_KEY },
-    })
-    const pixData = await pixResp.json()
-
-    // 4. Salvar payment_id no pedido
+    // 3. Salvar payment_id no pedido
     await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${pedido_id}`, {
       method: 'PATCH',
       headers: {
@@ -70,18 +65,35 @@ serve(async (req) => {
         'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
         'Prefer': 'return=minimal',
       },
-      body: JSON.stringify({ asaas_payment_id: charge.id, status_pagamento: 'aguardando_pix' }),
+      body: JSON.stringify({
+        asaas_payment_id: charge.id,
+        status_pagamento: tipo === 'PIX' ? 'aguardando_pix' : 'aguardando_cartao',
+      }),
     })
 
-    return new Response(JSON.stringify({
-      payment_id: charge.id,
-      qr_code: pixData.payload,
-      qr_code_image: pixData.encodedImage,
-      invoice_url: charge.invoiceUrl,
-      value: total,
-    }), {
-      headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
+    // 4. Para Pix: buscar QR Code. Para Cartão: retornar invoiceUrl
+    if (tipo === 'PIX') {
+      const pixResp = await fetch(`${ASAAS_BASE}/payments/${charge.id}/pixQrCode`, {
+        headers: { 'access_token': ASAAS_API_KEY },
+      })
+      const pixData = await pixResp.json()
+
+      return new Response(JSON.stringify({
+        tipo: 'PIX',
+        payment_id: charge.id,
+        qr_code: pixData.payload,
+        qr_code_image: pixData.encodedImage,
+        value: total,
+      }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    } else {
+      return new Response(JSON.stringify({
+        tipo: 'CREDIT_CARD',
+        payment_id: charge.id,
+        invoice_url: charge.invoiceUrl,
+        value: total,
+      }), { headers: { ...CORS, 'Content-Type': 'application/json' } })
+    }
+
   } catch (e) {
     console.error('criar-pix error:', e)
     return new Response(JSON.stringify({ error: String(e) }), {
