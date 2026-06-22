@@ -1,4 +1,78 @@
 <!DOCTYPE html>
+<!--
+╔══════════════════════════════════════════════════════════════════╗
+║              GELAMOUR — PAINEL ADMIN (admin.html)               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  PARA QUE SERVE
+  ──────────────
+  Painel privado acessado pela dona da Gelamour.
+  Mostra em tempo real todos os clientes cadastrados e pedidos
+  recebidos, com opção de atualizar status e exportar dados.
+
+  ACESSO
+  ──────
+  URL: /gelamour/admin.html
+  Login: e-mail + senha da conta Supabase da administradora
+  Token JWT salvo em sessionStorage (expira em 1h, logout automático)
+
+  ESTRUTURA GERAL
+  ───────────────
+  1. TELA DE LOGIN
+     └─ Campo de senha (e-mail fixo no código)
+     └─ POST /auth/v1/token → recebe JWT autenticado
+     └─ JWT salvo em sessionStorage com tempo de expiração
+
+  2. ABA "REGISTROS" (clientes)
+     └─ Lista todos os clientes cadastrados
+     └─ Colunas: nome, telefone, endereço, data de cadastro
+     └─ Se endereço vazio → busca automaticamente em pedidos pelo cliente_id
+     └─ Botão exportar CSV com proteção contra fórmulas maliciosas
+     └─ Atualiza a cada 5 segundos (polling)
+
+  3. ABA "PEDIDOS"
+     └─ Lista todos os pedidos por ordem de chegada (mais recente primeiro)
+     └─ Colunas: cliente, itens, total, pagamento, status, data
+     └─ Select de status por pedido: aguardando / confirmado / entregue / cancelado
+     └─ PATCH no Supabase ao trocar status
+     └─ Botão exportar CSV
+     └─ Atualiza a cada 5 segundos (polling)
+
+  POLLING (tempo real)
+  ────────────────────
+  setInterval a cada 5000ms (5 segundos)
+  Verifica expiração do token antes de cada chamada
+  Se token expirado → logout automático + limpa sessionStorage
+
+  BANCO DE DADOS (Supabase)
+  ─────────────────────────
+  Tabela CLIENTES: leitura de todos os registros
+  Tabela PEDIDOS:  leitura de todos + update de status
+  Role usado: "authenticated" (JWT do admin) — acesso total via RLS
+
+  ENRIQUECIMENTO DE DADOS
+  ───────────────────────
+  Clientes sem endereço são enriquecidos automaticamente:
+  → Busca em pedidos WHERE cliente_id = id do cliente
+  → Preenche endereço, nome, telefone se disponível
+  Fonte identificada como "pedido" para rastreabilidade
+
+  SEGURANÇA
+  ─────────
+  - JWT autenticado (role: authenticated) — não usa chave anon
+  - Token expira em 1h, logout automático
+  - XSS: todos os textos dinâmicos passam por esc()
+  - CSV: células com = + - @ recebem prefixo ' (anti-injection)
+  - Sem senha hardcoded no código
+  - frame-ancestors 'none' no CSP (anti-clickjacking)
+
+  TECNOLOGIAS
+  ───────────
+  - HTML/CSS/JS puro (sem frameworks)
+  - Supabase Auth (JWT) + REST API
+  - GitHub Pages (hospedagem gratuita)
+  - PWA: installable via manifest-admin.json
+-->
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
