@@ -325,11 +325,33 @@ async function sair() {
 }
 
 /* ══ API ══ */
+var FETCH_TIMEOUT = 12000; // 12 s
+
 async function req(method, path, body) {
-  var r = await fetch(API + path, { method: method, headers: H, body: body ? JSON.stringify(body) : undefined });
-  if (!r.ok) { var t = await r.text(); throw new Error(r.status + ': ' + t); }
-  if (r.status === 204) return null;
-  return r.json().catch(function(){ return null; });
+  // Verificar expiração do token antes de cada chamada
+  var exp = parseInt(sessionStorage.getItem(EXP_KEY) || '0');
+  if (exp && exp < Date.now()) { sair(); return null; }
+
+  var ctrl = new AbortController();
+  var tid = setTimeout(function(){ ctrl.abort(); }, FETCH_TIMEOUT);
+  try {
+    var r = await fetch(API + path, {
+      method: method,
+      headers: H,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+    // Token expirado no servidor → força logout
+    if (r.status === 401) { sair(); return null; }
+    if (!r.ok) { var t = await r.text(); throw new Error(r.status + ': ' + t); }
+    if (r.status === 204) return null;
+    return r.json().catch(function(){ return null; });
+  } catch(e) {
+    clearTimeout(tid);
+    if (e.name === 'AbortError') throw new Error('Tempo limite excedido — verifique sua conexão');
+    throw e;
+  }
 }
 
 /* ══ TABS ══ */
@@ -563,15 +585,26 @@ async function delPedido(id) {
 }
 
 /* ══ CSV ══ */
+function csvCell(val) {
+  var s = String(val == null ? '' : val);
+  // Proteção contra CSV/fórmula injection (Excel executa células que começam com = + - @)
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
 function exportarCSV() {
   var rows = [['#','Cliente','Telefone','Itens','Total','Pagamento','Status','Data']];
   pedidos.forEach(function(p){
-    var itens = Array.isArray(p.itens) ? p.itens.map(function(i){ return i.nome + ' R$' + parseFloat(i.preco||0).toFixed(2); }).join(' | ') : '';
-    rows.push([p.id, p.nome||'', p.telefone||'', itens,
+    var itens = Array.isArray(p.itens)
+      ? p.itens.map(function(i){ return (i.nome||'') + ' R$' + parseFloat(i.preco||0).toFixed(2); }).join(' | ')
+      : '';
+    rows.push([
+      p.id, p.nome||'', p.telefone||'', itens,
       parseFloat(p.total||0).toFixed(2), p.pagamento||'', p.status||'',
-      p.criado_em ? new Date(p.criado_em).toLocaleString('pt-BR') : '']);
+      p.criado_em ? new Date(p.criado_em).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'}) : ''
+    ]);
   });
-  var txt = rows.map(function(r){ return r.map(function(c){ return '"' + String(c).replace(/"/g,'""') + '"'; }).join(','); }).join('\n');
+  var txt = rows.map(function(r){ return r.map(csvCell).join(','); }).join('\n');
   var a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,﻿' + encodeURIComponent(txt);
   a.download = 'gelamour-pedidos-' + new Date().toISOString().slice(0,10) + '.csv';
@@ -591,11 +624,15 @@ function notif(msg){ if(Notification.permission==='granted') new Notification('G
 function beep(){try{var ctx=new(window.AudioContext||window.webkitAudioContext)();var o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.setValueAtTime(880,ctx.currentTime);o.frequency.setValueAtTime(1100,ctx.currentTime+.1);g.gain.setValueAtTime(.4,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.4);o.start();o.stop(ctx.currentTime+.4);}catch(_){}}
 
 /* ══ BOOT ══ */
+var _pollId = null;
+
 function iniciar() {
   buscarClientes();
-  if ('Notification' in window && Notification.permission !== 'granted') Notification.requestPermission();
 
-  setInterval(function(){
+  _pollId = setInterval(function(){
+    // Para o polling se o token expirou
+    var exp = parseInt(sessionStorage.getItem(EXP_KEY) || '0');
+    if (exp && exp < Date.now()) { clearInterval(_pollId); sair(); return; }
     if (abaAtiva === 'registros') buscarClientes();
     if (abaAtiva === 'pedidos')   buscarPedidos();
   }, POLL);
