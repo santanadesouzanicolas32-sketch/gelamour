@@ -96,6 +96,14 @@
     .btn.sm{padding:4px 10px;font-size:12px}
     .del{background:none;border:1px solid rgba(239,68,68,.2);color:rgba(239,68,68,.5);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;transition:all .15s}
     .del:hover{background:rgba(239,68,68,.1);color:var(--red);border-color:var(--red)}
+    .btn-end{background:none;border:1px dashed rgba(232,82,138,.4);color:var(--rosa);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;white-space:nowrap;transition:all .15s}
+    .btn-end:hover{background:rgba(232,82,138,.1)}
+    .end-form{display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap}
+    .end-form input{background:var(--card2);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:7px;font-size:12px;outline:none;font-family:inherit;width:200px}
+    .end-form input:focus{border-color:var(--rosa)}
+    .end-form button{padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:inherit}
+    .end-salvar{background:var(--green);color:#fff}
+    .end-cancelar{background:var(--card2);color:var(--muted)}
 
     /* TABELA */
     .tbox{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;overflow-x:auto}
@@ -245,7 +253,7 @@
       <table id="pTab" style="display:none;min-width:800px">
         <thead><tr>
           <th>#</th><th>Cliente</th><th>Telefone</th><th>Itens Pedidos</th>
-          <th>Total</th><th>Pagamento</th><th>Status</th><th>Data</th><th></th>
+          <th>Endereço</th><th>Total</th><th>Pagamento</th><th>Status</th><th>Data</th><th></th>
         </tr></thead>
         <tbody id="pTbody"></tbody>
       </table>
@@ -495,6 +503,10 @@ function renderPedidos() {
       + '<option value="cancelado"'  + (st==='cancelado' ?' selected':'') + '>❌ Cancelado</option>'
       + '</select>';
 
+    var endHtml = p.endereco
+      ? '<span class="tend" style="color:var(--text)">' + esc(p.endereco) + '</span>'
+      : '<button class="btn-end" onclick="mostrarEndForm(' + p.id + ')">📍 + Endereço</button>';
+
     var tr = document.createElement('tr');
     tr.id = 'r' + p.id;
     tr.innerHTML =
@@ -502,6 +514,7 @@ function renderPedidos() {
       + '<td class="tnome">' + esc(p.nome || '—') + '</td>'
       + '<td class="ttel">'  + waLink + '</td>'
       + '<td class="titens">' + itensHtml + '</td>'
+      + '<td id="end-' + p.id + '" class="tend">' + endHtml + '</td>'
       + '<td class="ttotal">R$ ' + parseFloat(p.total || 0).toFixed(2).replace('.', ',') + '</td>'
       + '<td style="font-size:12px;color:var(--muted)">' + esc(p.pagamento || '—') + '</td>'
       + '<td>' + statusSelect + '</td>'
@@ -536,6 +549,59 @@ async function delPedido(id) {
     kpis(); renderPedidos();
     toast('Pedido #' + id + ' removido');
   } catch(e) { aviso('Erro ao remover: ' + e.message); }
+}
+
+/* ══ ENDEREÇO INLINE ══ */
+function mostrarEndForm(pedidoId) {
+  var cel = document.getElementById('end-' + pedidoId);
+  if (!cel) return;
+  cel.innerHTML =
+    '<div class="end-form">'
+    + '<input type="text" id="endinp-' + pedidoId + '" placeholder="Rua, nº, bairro..." maxlength="200" style="min-width:180px">'
+    + '<button class="end-salvar" onclick="salvarEndereco(' + pedidoId + ')">✓</button>'
+    + '<button class="end-cancelar" onclick="renderPedidos()">✕</button>'
+    + '</div>';
+  var inp = document.getElementById('endinp-' + pedidoId);
+  if (inp) { inp.focus(); inp.addEventListener('keydown', function(e){ if(e.key==='Enter') salvarEndereco(pedidoId); if(e.key==='Escape') renderPedidos(); }); }
+}
+
+async function salvarEndereco(pedidoId) {
+  var inp = document.getElementById('endinp-' + pedidoId);
+  if (!inp) return;
+  var end = inp.value.trim();
+  if (!end) return;
+  var cel = document.getElementById('end-' + pedidoId);
+
+  try {
+    // Salva no pedido
+    await req('PATCH', '/pedidos?id=eq.' + pedidoId, { endereco: end });
+
+    // Atualiza estado local
+    var p = pedidos.find(function(x){ return x.id === pedidoId; });
+    if (p) p.endereco = end;
+
+    // Se o pedido tem telefone, tenta atualizar o endereço do cliente também
+    if (p && p.telefone) {
+      var tel = String(p.telefone).replace(/\D/g, '');
+      try {
+        await req('PATCH', '/clientes?telefone=eq.' + tel, { endereco: end });
+        // Atualiza também o array local de clientes
+        var cl = clientes.find(function(c){ return String(c.telefone).replace(/\D/g,'') === tel; });
+        if (cl) cl.endereco = end;
+        toast('Endereço salvo no pedido e no perfil do cliente ✓');
+      } catch(_) {
+        toast('Endereço salvo no pedido ✓ (cliente não encontrado no cadastro)');
+      }
+    } else {
+      toast('Endereço salvo no pedido ✓');
+    }
+
+    // Atualiza a célula visualmente
+    if (cel) cel.innerHTML = '<span class="tend" style="color:var(--text)">' + esc(end) + '</span>';
+  } catch(e) {
+    aviso('Erro ao salvar endereço: ' + e.message);
+    if (cel) cel.innerHTML = '<button class="btn-end" onclick="mostrarEndForm(' + pedidoId + ')">📍 + Endereço</button>';
+  }
 }
 
 /* ══ CSV ══ */
