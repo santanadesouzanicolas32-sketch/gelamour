@@ -1,5 +1,9 @@
 backend/node_modules/
 backend/.env
+node_modules/
+package-lock.json
+package.json
 *.log
 logo_b64.txt
 logo_temp.jpg
+supabase/.temp/
