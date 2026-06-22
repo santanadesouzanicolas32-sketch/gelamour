@@ -365,49 +365,81 @@
 
 <script>
 /* ── CONFIG ── */
-var API  = 'https://rfbtdtvsnftybazfmdbw.supabase.co/rest/v1';
-var KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmYnRkdHZzbmZ0eWJhemZtZGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MTAzNjAsImV4cCI6MjA5NzQ4NjM2MH0.Hw68jQFFmwLgvwF9zjhgVWPc3D1Q2pfgAn1TQlJEVu4';
-var H    = {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+var SUPA = 'https://rfbtdtvsnftybazfmdbw.supabase.co';
+var API  = SUPA + '/rest/v1';
+// anon key: publica por design do Supabase — seguranca real vem do RLS
+var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmYnRkdHZzbmZ0eWJhemZtZGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MTAzNjAsImV4cCI6MjA5NzQ4NjM2MH0.Hw68jQFFmwLgvwF9zjhgVWPc3D1Q2pfgAn1TQlJEVu4';
 var POLL = 5000;
+// H e montado apos login com o token autenticado — nunca usa anon para dados
+var H = {};
 
-/* ── LOGIN ── */
-var HASH = '0003b96e1c49c66db718a1e1017195a5f9ad65ad8e473fa7ff2d1e62f7bb7c0e';
-var SESSION_KEY = 'gm_auth_exp';
-
-async function sha256(str) {
-  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
-}
+/* ── AUTH SUPABASE ── */
+var ADMIN_EMAIL = 'santanadesouzanicolas32@gmail.com';
+var TOKEN_KEY   = 'gm_token';
+var EXP_KEY     = 'gm_token_exp';
 
 async function entrar() {
-  var senha = document.getElementById('loginSenha').value;
-  var h = await sha256(senha);
-  if (h === HASH) {
-    var exp = Date.now() + 24 * 60 * 60 * 1000;
-    localStorage.setItem(SESSION_KEY, exp);
+  var senha = document.getElementById('loginSenha').value.trim();
+  if (!senha) return;
+  var btn = document.querySelector('.login-btn');
+  btn.textContent = 'Entrando...'; btn.disabled = true;
+
+  try {
+    var r = await fetch(SUPA + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': ANON },
+      body: JSON.stringify({ email: ADMIN_EMAIL, password: senha })
+    });
+    var data = await r.json();
+
+    if (!r.ok) throw new Error(data.error_description || data.msg || 'Erro');
+
+    // Salva token autenticado (role=authenticated) — nunca a service_role key
+    sessionStorage.setItem(TOKEN_KEY, data.access_token);
+    sessionStorage.setItem(EXP_KEY,   Date.now() + data.expires_in * 1000);
+
+    // Todos os requests do admin usam este token, que tem role=authenticated no RLS
+    H = {
+      'apikey':        ANON,
+      'Authorization': 'Bearer ' + data.access_token,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation'
+    };
+
     document.getElementById('login-screen').style.display = 'none';
     iniciar();
-  } else {
+  } catch(e) {
     var err = document.getElementById('loginErr');
     err.textContent = 'Senha incorreta';
     document.getElementById('loginSenha').value = '';
     document.getElementById('loginSenha').focus();
     setTimeout(function(){ err.textContent = ''; }, 3000);
+  } finally {
+    btn.textContent = 'Entrar'; btn.disabled = false;
   }
 }
 
 function sair() {
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(EXP_KEY);
   location.reload();
 }
 
 function verificarSessao() {
-  var exp = parseInt(localStorage.getItem(SESSION_KEY) || '0');
-  if (exp > Date.now()) {
+  var token = sessionStorage.getItem(TOKEN_KEY);
+  var exp   = parseInt(sessionStorage.getItem(EXP_KEY) || '0');
+  if (token && exp > Date.now()) {
+    H = {
+      'apikey':        ANON,
+      'Authorization': 'Bearer ' + token,
+      'Content-Type':  'application/json',
+      'Prefer':        'return=representation'
+    };
     document.getElementById('login-screen').style.display = 'none';
     iniciar();
   } else {
-    document.getElementById('loginSenha').focus();
+    sessionStorage.removeItem(TOKEN_KEY);
+    setTimeout(function(){ document.getElementById('loginSenha').focus(); }, 100);
   }
 }
 
