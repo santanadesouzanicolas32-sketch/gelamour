@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://rfbtdtvsnftybazfmdbw.supabase.co; img-src 'self' data:; base-uri 'self';">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
   <title>Gelamour — Painel Admin</title>
   <link rel="manifest" href="manifest-admin.json">
   <meta name="theme-color" content="#E8528A">
@@ -419,7 +422,16 @@ async function entrar() {
   }
 }
 
-function sair() {
+async function sair() {
+  try {
+    var token = sessionStorage.getItem(TOKEN_KEY);
+    if (token) {
+      await fetch(SUPA + '/auth/v1/logout', {
+        method: 'POST',
+        headers: { apikey: ANON, Authorization: 'Bearer ' + token }
+      });
+    }
+  } catch(_) {}
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(EXP_KEY);
   location.reload();
@@ -530,11 +542,18 @@ function renderPedidos(lista) {
   var tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
   lista.forEach(function(p){
-    var tel = p.telefone||'';
-    var telFmt = tel ? tel.replace(/^(\d{2})(\d{4,5})(\d{4})$/,'($1) $2-$3') : '—';
-    var wa = tel
-      ? '<a href="https://wa.me/55'+tel+'" target="_blank">📱 '+telFmt+'</a>'
-      : '<span style="color:var(--muted)">—</span>';
+    // Segurança: validar tel estritamente — apenas dígitos 10-11 chars
+    var telRaw   = String(p.telefone || '');
+    var telClean = telRaw.replace(/\D/g, '');
+    var wa;
+    if (/^\d{10,11}$/.test(telClean)) {
+      var telFmt = telClean.replace(/^(\d{2})(\d{4,5})(\d{4})$/, '($1) $2-$3');
+      wa = '<a href="https://wa.me/55' + telClean + '" target="_blank" rel="noopener noreferrer">📱 ' + esc(telFmt) + '</a>';
+    } else if (telRaw) {
+      wa = '<span style="color:var(--muted)">' + esc(telRaw.slice(0, 20)) + '</span>';
+    } else {
+      wa = '<span style="color:var(--muted)">—</span>';
+    }
     var dt = p.criado_em
       ? new Date(p.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})
       : '—';
