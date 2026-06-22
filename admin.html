@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gelamour — Painel Admin</title>
-
-  <!-- PWA -->
   <link rel="manifest" href="manifest-admin.json">
   <meta name="theme-color" content="#E8528A">
   <meta name="mobile-web-app-capable" content="yes">
@@ -16,11 +14,11 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-admin-192.png">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* ── BASE ── */
     :root{
       --rosa:#E8528A;--rosa2:#C23A6E;--gold:#D4AF37;
-      --marrom:#4A2C17;--bg:#0d0d12;--card:#16161f;
-      --card2:#1e1e2a;--border:#2a2a38;
-      --text:#eeeef5;--muted:#7777900;--muted:#777090;
+      --bg:#0d0d12;--card:#16161f;--card2:#1e1e2a;--border:#2a2a38;
+      --text:#eeeef5;--muted:#777090;
       --green:#22c55e;--yellow:#f59e0b;--blue:#3b82f6;--red:#ef4444;--purple:#a855f7;
     }
     *{box-sizing:border-box;margin:0;padding:0}
@@ -28,37 +26,83 @@
     ::-webkit-scrollbar{width:5px;height:5px}
     ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
-    /* NAV */
+    /* ── TELA DE LOGIN ── */
+    #login-screen{
+      position:fixed;inset:0;background:var(--bg);z-index:999;
+      display:flex;align-items:center;justify-content:center;padding:24px;
+    }
+    .login-box{
+      background:var(--card);border:1px solid var(--border);border-radius:20px;
+      padding:40px 36px;width:100%;max-width:380px;text-align:center;
+    }
+    .login-logo{font-size:40px;margin-bottom:12px}
+    .login-title{font-size:22px;font-weight:700;color:var(--gold);margin-bottom:4px}
+    .login-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
+    .login-field{
+      width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
+      padding:12px 16px;border-radius:10px;font-size:14px;outline:none;
+      font-family:inherit;text-align:center;letter-spacing:2px;margin-bottom:16px;
+    }
+    .login-field:focus{border-color:var(--rosa)}
+    .login-btn{
+      width:100%;padding:12px;background:var(--rosa);color:#fff;border:none;
+      border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+      transition:background .15s;
+    }
+    .login-btn:hover{background:var(--rosa2)}
+    .login-err{color:#f87171;font-size:12px;margin-top:10px;min-height:18px}
+
+    /* ── NAV ── */
     nav{
       background:var(--card);border-bottom:1px solid var(--border);
       padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;
       position:sticky;top:0;z-index:50;
     }
     .brand{font-weight:700;font-size:15px;color:var(--gold);display:flex;align-items:center;gap:8px}
+    .nav-right{display:flex;align-items:center;gap:16px}
     #sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
     #sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .btn-sair{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit}
+    .btn-sair:hover{color:var(--red);border-color:var(--red)}
 
-    /* LAYOUT */
-    .page{padding:20px 24px;max-width:1360px;margin:0 auto}
+    /* ── LAYOUT ── */
+    .page{padding:24px;max-width:1360px;margin:0 auto}
 
-    /* AVISO */
+    /* ── AVISO ── */
     #aviso{
       background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);
       color:#fca5a5;padding:10px 16px;border-radius:10px;font-size:13px;
       margin-bottom:16px;display:none;
     }
 
-    /* KPI */
-    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+    /* ── TABS ── */
+    .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:24px}
+    .tab-btn{
+      padding:11px 22px;background:none;border:none;color:var(--muted);
+      font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;
+      transition:all .15s;font-family:inherit;letter-spacing:.2px;
+    }
+    .tab-btn:hover{color:var(--text)}
+    .tab-btn.ativo{color:var(--rosa);border-bottom-color:var(--rosa)}
+    .tab-content{display:none}
+    .tab-content.ativo{display:block}
+
+    /* ── SECTION HEADER ── */
+    .sec-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+    .sec-title{font-size:15px;font-weight:700;color:var(--text)}
+    .sec-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+    /* ── KPI ── */
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
     .kpi{
       background:var(--card);border:1px solid var(--border);border-radius:12px;
-      padding:16px 18px;border-top:2px solid var(--c);
+      padding:16px 18px;border-top:3px solid var(--c);
     }
-    .kpi small{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:600}
+    .kpi small{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600}
     .kpi b{display:block;font-size:26px;font-weight:700;margin-top:6px;color:var(--c)}
 
-    /* TOOLBAR */
+    /* ── TOOLBAR ── */
     .bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
     .bar input,.bar select{
       background:var(--card);border:1px solid var(--border);color:var(--text);
@@ -70,46 +114,76 @@
     .btn{
       padding:7px 14px;background:var(--rosa);color:#fff;border:none;
       border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
+      transition:background .15s;
     }
     .btn:hover{background:var(--rosa2)}
     .btn.sec{background:var(--card2);border:1px solid var(--border);color:var(--muted)}
     .btn.sec:hover{color:var(--text);border-color:var(--rosa)}
-    #count{font-size:12px;color:var(--muted);margin-left:auto}
+    #count,#pCount{font-size:12px;color:var(--muted);margin-left:auto}
 
-    /* TABELA */
+    /* ── TABELA ── */
     .tbox{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;overflow-x:auto}
-    table{width:100%;border-collapse:collapse;min-width:900px}
+    table{width:100%;border-collapse:collapse;min-width:500px}
     thead{background:var(--card2)}
-    th{padding:11px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:600;white-space:nowrap}
+    th{padding:11px 16px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:600;white-space:nowrap}
     tbody tr{border-top:1px solid var(--border);transition:background .12s}
-    tbody tr:hover{background:rgba(232,82,138,.05)}
-    td{padding:12px 14px;font-size:13px;vertical-align:middle}
+    tbody tr:hover{background:rgba(232,82,138,.04)}
+    td{padding:13px 16px;font-size:13px;vertical-align:middle}
 
     .tid{font-weight:700;color:var(--muted);font-size:12px}
-    .tnome{font-weight:600}
-    .tobs{font-size:11px;color:var(--muted);margin-top:3px}
-    .titens{font-size:11px;color:var(--muted);line-height:1.8;max-width:200px}
-    .ttotal{font-weight:700;color:var(--rosa);white-space:nowrap}
+    .tnome{font-weight:600;color:var(--text)}
     .tdata{font-size:11px;color:var(--muted);white-space:nowrap}
+    .ttel a{color:var(--green);text-decoration:none;font-size:12px}
+    .ttel a:hover{text-decoration:underline}
+    .tend{font-size:12px;color:var(--muted);max-width:200px}
 
-    .badge{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;border:none;cursor:pointer;font-family:inherit;outline:none;appearance:none}
-    .badge.pendente  {background:rgba(245,158,11,.15);color:#fbbf24}
-    .badge.confirmado{background:rgba(34,197,94,.15) ;color:#4ade80}
-    .badge.entregue  {background:rgba(59,130,246,.15) ;color:#60a5fa}
-    .badge.cancelado {background:rgba(239,68,68,.15)  ;color:#f87171}
+    /* Colunas produto */
+    .ttotal{font-weight:700;color:var(--rosa);white-space:nowrap}
+    .cat-tag{
+      display:inline-block;padding:2px 9px;border-radius:12px;font-size:10px;font-weight:700;
+      background:rgba(232,82,138,.12);color:var(--rosa);border:1px solid rgba(232,82,138,.25);
+    }
+    .disp-toggle{
+      width:36px;height:20px;background:var(--border);border-radius:10px;
+      position:relative;cursor:pointer;border:none;transition:background .2s;flex-shrink:0;
+    }
+    .disp-toggle.on{background:var(--green)}
+    .disp-toggle::after{
+      content:'';position:absolute;width:14px;height:14px;background:#fff;
+      border-radius:50%;top:3px;left:3px;transition:left .2s;
+    }
+    .disp-toggle.on::after{left:19px}
+    .del{background:none;border:1px solid rgba(239,68,68,.2);color:rgba(239,68,68,.5);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;transition:all .15s}
+    .del:hover{background:rgba(239,68,68,.1);color:var(--red);border-color:var(--red)}
 
-    .pag{font-size:11px;background:var(--card2);border:1px solid var(--border);padding:2px 8px;border-radius:5px;color:var(--muted)}
-    .wa{color:var(--green);text-decoration:none;font-size:12px}
-    .wa:hover{text-decoration:underline}
-    .del{background:none;border:1px solid rgba(239,68,68,.25);color:rgba(239,68,68,.6);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
-    .del:hover{background:rgba(239,68,68,.15);color:var(--red);border-color:var(--red)}
-
-    /* VAZIO / LOADING */
-    .center{text-align:center;padding:60px 20px;color:var(--muted)}
+    /* ── VAZIO / LOADING ── */
+    .center{text-align:center;padding:56px 20px;color:var(--muted)}
     .spin{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--rosa);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
     @keyframes spin{to{transform:rotate(360deg)}}
 
-    /* TOAST */
+    /* ── MODAL PRODUTO ── */
+    .modal-bg{
+      position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;
+      display:none;align-items:center;justify-content:center;padding:16px;
+    }
+    .modal-bg.open{display:flex}
+    .modal{
+      background:var(--card);border:1px solid var(--border);border-radius:16px;
+      padding:28px;width:100%;max-width:440px;
+    }
+    .modal h3{font-size:16px;font-weight:700;margin-bottom:20px;color:var(--text)}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:600;margin-bottom:6px}
+    .field input,.field select,.field textarea{
+      width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
+      padding:9px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit;
+    }
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--rosa)}
+    .field textarea{resize:vertical;min-height:70px}
+    .field select option{background:var(--card2)}
+    .modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+    /* ── TOAST ── */
     #toast{
       position:fixed;bottom:20px;right:20px;z-index:999;max-width:300px;
       background:var(--card2);border:1px solid var(--green);color:var(--text);
@@ -119,66 +193,36 @@
     }
     #toast.on{opacity:1;transform:translateY(0)}
 
-    @media(max-width:600px){.page{padding:12px}.kpis{grid-template-columns:1fr 1fr}nav{padding:0 14px}}
-
-    /* TABS */
-    .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px}
-    .tab-btn{
-      padding:10px 20px;background:none;border:none;color:var(--muted);
-      font-size:14px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;
-      transition:all .15s;font-family:inherit;
+    @media(max-width:600px){
+      .page{padding:14px}
+      .kpis{grid-template-columns:1fr 1fr}
+      nav{padding:0 14px}
+      .login-box{padding:28px 20px}
     }
-    .tab-btn:hover{color:var(--text)}
-    .tab-btn.ativo{color:var(--rosa);border-bottom-color:var(--rosa)}
-    .tab-content{display:none}
-    .tab-content.ativo{display:block}
-
-    /* CARDAPIO */
-    .prod-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
-    .prod-header h2{font-size:15px;font-weight:700;color:var(--text)}
-    .cat-tag{
-      display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;
-      background:rgba(232,82,138,.15);color:var(--rosa);border:1px solid rgba(232,82,138,.3);
-    }
-    .disp-toggle{
-      width:36px;height:20px;background:var(--border);border-radius:10px;
-      position:relative;cursor:pointer;border:none;transition:background .2s;
-    }
-    .disp-toggle.on{background:var(--green)}
-    .disp-toggle::after{
-      content:'';position:absolute;width:14px;height:14px;background:#fff;
-      border-radius:50%;top:3px;left:3px;transition:left .2s;
-    }
-    .disp-toggle.on::after{left:19px}
-
-    /* MODAL */
-    .modal-bg{
-      position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
-      display:none;align-items:center;justify-content:center;padding:16px;
-    }
-    .modal-bg.open{display:flex}
-    .modal{
-      background:var(--card);border:1px solid var(--border);border-radius:16px;
-      padding:24px;width:100%;max-width:440px;
-    }
-    .modal h3{font-size:16px;font-weight:700;margin-bottom:18px;color:var(--text)}
-    .field{margin-bottom:14px}
-    .field label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-weight:600;margin-bottom:6px}
-    .field input,.field select,.field textarea{
-      width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
-      padding:8px 12px;border-radius:8px;font-size:13px;outline:none;font-family:inherit;
-    }
-    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--rosa)}
-    .field textarea{resize:vertical;min-height:70px}
-    .field select option{background:var(--card2)}
-    .modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
   </style>
 </head>
 <body>
 
+<!-- ══ TELA DE LOGIN ══ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">🍰</div>
+    <div class="login-title">Gelamour Admin</div>
+    <div class="login-sub">Digite a senha para continuar</div>
+    <input class="login-field" type="password" id="loginSenha" placeholder="••••••••••••"
+      onkeydown="if(event.key==='Enter')entrar()">
+    <button class="login-btn" onclick="entrar()">Entrar</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- ══ NAV ══ -->
 <nav>
   <div class="brand">🍰 Gelamour · Admin</div>
-  <div id="sync"><div id="sync-dot"></div><span id="sync-txt">Sincronizando...</span></div>
+  <div class="nav-right">
+    <div id="sync"><div id="sync-dot"></div><span id="sync-txt">Sincronizando...</span></div>
+    <button class="btn-sair" onclick="sair()">Sair</button>
+  </div>
 </nav>
 
 <div class="page">
@@ -187,81 +231,90 @@
 
   <!-- TABS -->
   <div class="tabs">
-    <button class="tab-btn ativo" onclick="mudarAba('pedidos',this)">📋 Pedidos</button>
-    <button class="tab-btn" onclick="mudarAba('cardapio',this)">🍰 Cardápio</button>
+    <button class="tab-btn ativo" onclick="mudarAba('cardapio',this)">🍰 Cardápio</button>
+    <button class="tab-btn" onclick="mudarAba('pedidos',this)">📋 Pedidos</button>
   </div>
 
-  <!-- ═══ ABA PEDIDOS ═══ -->
-  <div id="tab-pedidos" class="tab-content ativo">
+  <!-- ══ ABA CARDÁPIO ══ -->
+  <div id="tab-cardapio" class="tab-content ativo">
 
-  <!-- KPIs -->
-  <div class="kpis">
-    <div class="kpi" style="--c:var(--rosa)">   <small>Total</small>      <b id="kTot">—</b></div>
-    <div class="kpi" style="--c:var(--yellow)"> <small>Pendentes</small>  <b id="kPen">—</b></div>
-    <div class="kpi" style="--c:var(--green)">  <small>Entregues</small>  <b id="kEnt">—</b></div>
-    <div class="kpi" style="--c:var(--blue)">   <small>Confirmados</small><b id="kCon">—</b></div>
-    <div class="kpi" style="--c:var(--purple)"> <small>Faturamento</small><b id="kFat">—</b></div>
-  </div>
-
-  <!-- TOOLBAR -->
-  <div class="bar">
-    <select id="fSt" onchange="renderFiltrado()">
-      <option value="">Todos os status</option>
-      <option value="pendente">⏳ Pendente</option>
-      <option value="confirmado">✅ Confirmado</option>
-      <option value="entregue">🚀 Entregue</option>
-      <option value="cancelado">❌ Cancelado</option>
-    </select>
-    <input id="fNome" type="text" placeholder="Buscar nome..." oninput="renderFiltrado()" style="min-width:180px">
-    <input id="fData" type="date" onchange="renderFiltrado()">
-    <button class="btn" onclick="buscar()">↻ Atualizar</button>
-    <button class="btn sec" onclick="csv()">⬇ CSV</button>
-    <span id="count"></span>
-  </div>
-
-  <!-- TABELA -->
-  <div class="tbox">
-    <div id="loading" class="center"><div class="spin"></div><p>Buscando pedidos...</p></div>
-    <div id="vazio"   class="center" style="display:none"><p style="font-size:36px;margin-bottom:10px">📭</p><p>Nenhum pedido encontrado</p></div>
-    <table id="tab"   style="display:none">
-      <thead><tr>
-        <th>#</th><th>Cliente</th><th>WhatsApp</th><th>Endereço</th>
-        <th>Itens</th><th>Total</th><th>Pag.</th><th>Status</th><th>Data</th><th></th>
-      </tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-
-  </div><!-- #tab-pedidos -->
-
-  <!-- ═══ ABA CARDÁPIO ═══ -->
-  <div id="tab-cardapio" class="tab-content">
-
-    <div class="prod-header">
-      <h2>Gerenciar Cardápio</h2>
+    <div class="sec-header">
+      <div>
+        <div class="sec-title">Gerenciar Cardápio</div>
+        <div class="sec-sub">Adicione, edite ou oculte itens do seu cardápio</div>
+      </div>
       <button class="btn" onclick="abrirModal()">+ Novo Item</button>
     </div>
 
-    <div class="bar" style="margin-bottom:14px">
+    <div class="bar">
       <select id="pFiltCat" onchange="renderProd()">
         <option value="">Todas as categorias</option>
       </select>
       <input id="pFiltNome" type="text" placeholder="Buscar produto..." oninput="renderProd()" style="min-width:180px">
-      <span id="pCount" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+      <span id="pCount"></span>
     </div>
 
     <div class="tbox">
       <div id="pLoading" class="center"><div class="spin"></div><p>Buscando produtos...</p></div>
-      <div id="pVazio"   class="center" style="display:none"><p style="font-size:36px;margin-bottom:10px">🍰</p><p>Nenhum produto cadastrado</p></div>
-      <table id="pTab" style="display:none">
+      <div id="pVazio" class="center" style="display:none">
+        <p style="font-size:40px;margin-bottom:12px">🍰</p>
+        <p style="font-weight:600;margin-bottom:6px">Nenhum produto cadastrado</p>
+        <p style="font-size:12px">Clique em "+ Novo Item" para começar</p>
+      </div>
+      <table id="pTab" style="display:none;min-width:600px">
         <thead><tr>
-          <th>#</th><th>Nome</th><th>Descrição</th><th>Categoria</th><th>Preço</th><th>Disponível</th><th></th>
+          <th>#</th><th>Nome</th><th>Categoria</th><th>Preço</th><th>Disponível</th><th></th>
         </tr></thead>
         <tbody id="pTbody"></tbody>
       </table>
     </div>
 
   </div><!-- #tab-cardapio -->
+
+  <!-- ══ ABA PEDIDOS ══ -->
+  <div id="tab-pedidos" class="tab-content">
+
+    <!-- KPIs -->
+    <div class="kpis">
+      <div class="kpi" style="--c:var(--rosa)">   <small>Total</small>      <b id="kTot">—</b></div>
+      <div class="kpi" style="--c:var(--yellow)"> <small>Pendentes</small>  <b id="kPen">—</b></div>
+      <div class="kpi" style="--c:var(--green)">  <small>Entregues</small>  <b id="kEnt">—</b></div>
+      <div class="kpi" style="--c:var(--blue)">   <small>Confirmados</small><b id="kCon">—</b></div>
+      <div class="kpi" style="--c:var(--purple)"> <small>Faturamento</small><b id="kFat">—</b></div>
+    </div>
+
+    <div class="sec-header">
+      <div>
+        <div class="sec-title">Pedidos Recebidos</div>
+        <div class="sec-sub">Atualizado automaticamente a cada 5 segundos</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn sec" onclick="buscar()">↻ Atualizar</button>
+        <button class="btn sec" onclick="csv()">⬇ CSV</button>
+      </div>
+    </div>
+
+    <div class="bar">
+      <input id="fNome" type="text" placeholder="Buscar nome..." oninput="renderFiltrado()" style="min-width:180px">
+      <input id="fData" type="date" onchange="renderFiltrado()">
+      <span id="count"></span>
+    </div>
+
+    <div class="tbox">
+      <div id="loading" class="center"><div class="spin"></div><p>Buscando pedidos...</p></div>
+      <div id="vazio" class="center" style="display:none">
+        <p style="font-size:40px;margin-bottom:12px">📭</p>
+        <p style="font-weight:600">Nenhum pedido encontrado</p>
+      </div>
+      <table id="tab" style="display:none;min-width:500px">
+        <thead><tr>
+          <th>#</th><th>Cliente</th><th>Telefone</th><th>Endereço</th><th>Data</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+  </div><!-- #tab-pedidos -->
 
 </div><!-- .page -->
 
@@ -272,21 +325,21 @@
     <input type="hidden" id="pId">
     <div class="field">
       <label>Nome *</label>
-      <input type="text" id="pNome" placeholder="Ex: Bolo de Chocolate">
+      <input type="text" id="pNome" placeholder="Ex: Brownie de Chocolate">
     </div>
     <div class="field">
       <label>Descrição</label>
-      <textarea id="pDesc" placeholder="Ex: Bolo fofinho com cobertura de chocolate belga"></textarea>
+      <textarea id="pDesc" placeholder="Ex: Brownie cremoso com gotas de chocolate belga"></textarea>
     </div>
     <div class="field">
       <label>Categoria</label>
       <select id="pCat">
-        <option>Bolos</option>
-        <option>Tortas</option>
-        <option>Docinhos</option>
         <option>Brownies</option>
+        <option>Caseirinhos</option>
         <option>Mousses</option>
-        <option>Geladinhos</option>
+        <option>Vitaminas</option>
+        <option>Bebidas</option>
+        <option>Bolo na Forma</option>
         <option>Outros</option>
       </select>
     </div>
@@ -297,8 +350,8 @@
     <div class="field">
       <label>Disponível no cardápio</label>
       <select id="pDisp">
-        <option value="true">✅ Sim</option>
-        <option value="false">❌ Não (ocultar do site)</option>
+        <option value="true">✅ Sim — aparece no site</option>
+        <option value="false">❌ Não — oculto do site</option>
       </select>
     </div>
     <div class="modal-btns">
@@ -311,17 +364,59 @@
 <div id="toast"></div>
 
 <script>
-/* ── CONFIG ─────────────────────────────────────── */
+/* ── CONFIG ── */
 var API  = 'https://rfbtdtvsnftybazfmdbw.supabase.co/rest/v1';
 var KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmYnRkdHZzbmZ0eWJhemZtZGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5MTAzNjAsImV4cCI6MjA5NzQ4NjM2MH0.Hw68jQFFmwLgvwF9zjhgVWPc3D1Q2pfgAn1TQlJEVu4';
 var H    = {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-var POLL = 5000; // 5 segundos
+var POLL = 5000;
 
-/* ── STATE ───────────────────────────────────────── */
+/* ── LOGIN ── */
+var HASH = '0003b96e1c49c66db718a1e1017195a5f9ad65ad8e473fa7ff2d1e62f7bb7c0e';
+var SESSION_KEY = 'gm_auth_exp';
+
+async function sha256(str) {
+  var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+async function entrar() {
+  var senha = document.getElementById('loginSenha').value;
+  var h = await sha256(senha);
+  if (h === HASH) {
+    var exp = Date.now() + 24 * 60 * 60 * 1000;
+    localStorage.setItem(SESSION_KEY, exp);
+    document.getElementById('login-screen').style.display = 'none';
+    iniciar();
+  } else {
+    var err = document.getElementById('loginErr');
+    err.textContent = 'Senha incorreta';
+    document.getElementById('loginSenha').value = '';
+    document.getElementById('loginSenha').focus();
+    setTimeout(function(){ err.textContent = ''; }, 3000);
+  }
+}
+
+function sair() {
+  localStorage.removeItem(SESSION_KEY);
+  location.reload();
+}
+
+function verificarSessao() {
+  var exp = parseInt(localStorage.getItem(SESSION_KEY) || '0');
+  if (exp > Date.now()) {
+    document.getElementById('login-screen').style.display = 'none';
+    iniciar();
+  } else {
+    document.getElementById('loginSenha').focus();
+  }
+}
+
+/* ── STATE ── */
 var todos = [];
-var ultimo = 0; // id do último pedido visto
+var ultimo = 0;
+var prods  = [];
 
-/* ── API ─────────────────────────────────────────── */
+/* ── API ── */
 async function req(method, path, body) {
   var r = await fetch(API + path, {method:method, headers:H, body:body?JSON.stringify(body):undefined});
   if (!r.ok) { var t=await r.text(); throw new Error(r.status+': '+t); }
@@ -329,18 +424,28 @@ async function req(method, path, body) {
   return r.json().catch(function(){return null});
 }
 
-/* ── BUSCAR TODOS OS PEDIDOS ─────────────────────── */
+/* ── ABAS ── */
+function mudarAba(aba, btn) {
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('ativo'); });
+  document.querySelectorAll('.tab-content').forEach(function(d){ d.classList.remove('ativo'); });
+  btn.classList.add('ativo');
+  document.getElementById('tab-'+aba).classList.add('ativo');
+  if (aba === 'pedidos') buscar();
+  if (aba === 'cardapio') buscarProd();
+}
+
+/* ── PEDIDOS ── */
 async function buscar() {
   try {
-    var data = await req('GET', '/pedidos?select=*&order=criado_em.desc');
+    var data = await req('GET', '/pedidos?select=id,nome,telefone,endereco,criado_em&order=criado_em.desc');
     todos = Array.isArray(data) ? data : [];
 
-    // detectar novo pedido
     if (todos.length > 0) {
       var maxId = Math.max.apply(null, todos.map(function(p){return p.id}));
       if (ultimo > 0 && maxId > ultimo) {
         var novo = todos.find(function(p){return p.id===maxId});
         toast('🛒 Novo pedido de '+(novo?novo.nome:'alguém')+'!');
+        beep();
         notif('Novo pedido de '+(novo?novo.nome:'alguém'));
       }
       ultimo = maxId;
@@ -348,7 +453,7 @@ async function buscar() {
 
     kpis();
     renderFiltrado();
-    sync('🟢 Atualizado · '+new Date().toLocaleTimeString('pt-BR'));
+    sync('🟢 '+new Date().toLocaleTimeString('pt-BR'));
     aviso('');
   } catch(e) {
     aviso('Erro ao buscar pedidos: '+e.message);
@@ -356,38 +461,34 @@ async function buscar() {
   }
 }
 
-/* ── KPIs ────────────────────────────────────────── */
-function kpis() {
-  document.getElementById('kTot').textContent = todos.length;
-  document.getElementById('kPen').textContent = todos.filter(function(p){return p.status==='pendente'}).length;
-  document.getElementById('kEnt').textContent = todos.filter(function(p){return p.status==='entregue'}).length;
-  document.getElementById('kCon').textContent = todos.filter(function(p){return p.status==='confirmado'}).length;
-  var fat = todos.reduce(function(s,p){return s+parseFloat(p.total||0)},0);
-  document.getElementById('kFat').textContent = 'R$ '+fat.toFixed(2).replace('.',',');
+async function kpis() {
+  try {
+    var data = await req('GET', '/pedidos?select=status,total');
+    var lista = Array.isArray(data) ? data : [];
+    document.getElementById('kTot').textContent = lista.length;
+    document.getElementById('kPen').textContent = lista.filter(function(p){return p.status==='pendente'}).length;
+    document.getElementById('kEnt').textContent = lista.filter(function(p){return p.status==='entregue'}).length;
+    document.getElementById('kCon').textContent = lista.filter(function(p){return p.status==='confirmado'}).length;
+    var fat = lista.reduce(function(s,p){return s+parseFloat(p.total||0)},0);
+    document.getElementById('kFat').textContent = 'R$ '+fat.toFixed(2).replace('.',',');
+  } catch(_) {}
 }
 
-/* ── FILTRAR E RENDERIZAR ────────────────────────── */
 function renderFiltrado() {
-  var st   = document.getElementById('fSt').value;
   var nome = document.getElementById('fNome').value.toLowerCase();
   var data = document.getElementById('fData').value;
-
   var lista = todos.filter(function(p){
-    return (!st   || p.status===st)
-        && (!nome || (p.nome||'').toLowerCase().indexOf(nome)!==-1)
+    return (!nome || (p.nome||'').toLowerCase().indexOf(nome)!==-1)
         && (!data || (p.criado_em||'').indexOf(data)!==-1);
   });
-
   document.getElementById('count').textContent = lista.length+' pedido'+(lista.length!==1?'s':'');
-  render(lista);
+  renderPedidos(lista);
 }
 
-/* ── RENDER TABELA ───────────────────────────────── */
-function render(lista) {
+function renderPedidos(lista) {
   document.getElementById('loading').style.display = 'none';
-
   if (!lista.length) {
-    document.getElementById('tab').style.display   = 'none';
+    document.getElementById('tab').style.display  = 'none';
     document.getElementById('vazio').style.display = 'block';
     return;
   }
@@ -396,157 +497,49 @@ function render(lista) {
 
   var tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
-
   lista.forEach(function(p){
-    var itens  = Array.isArray(p.itens) ? p.itens : [];
-    var iHtml  = itens.map(function(i){
-      return '· '+esc(i.nome)+' <span style="color:var(--rosa)">R$'
-             +parseFloat(i.preco||0).toFixed(2).replace('.',',')+'</span>';
-    }).join('<br>');
-
-    var dt = new Date(p.criado_em).toLocaleString('pt-BR',
-      {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'});
-
-    var tel    = p.telefone||'';
-    var telFmt = tel ? tel.replace(/^(\d{2})(\d{4,5})(\d{4})$/,'($1) $2-$3') : '';
-    var wa     = telFmt
-      ? '<a href="https://wa.me/55'+tel+'" target="_blank" class="wa">📱 '+telFmt+'</a>'
+    var tel = p.telefone||'';
+    var telFmt = tel ? tel.replace(/^(\d{2})(\d{4,5})(\d{4})$/,'($1) $2-$3') : '—';
+    var wa = tel
+      ? '<a href="https://wa.me/55'+tel+'" target="_blank">📱 '+telFmt+'</a>'
       : '<span style="color:var(--muted)">—</span>';
-
-    var sel =
-      '<select class="badge '+p.status+'" onchange="mudar('+p.id+',this)">'
-      +'<option value="pendente"'  +(p.status==='pendente'  ?' selected':'')+'>⏳ Pendente</option>'
-      +'<option value="confirmado"'+(p.status==='confirmado'?' selected':'')+'>✅ Confirmado</option>'
-      +'<option value="entregue"'  +(p.status==='entregue'  ?' selected':'')+'>🚀 Entregue</option>'
-      +'<option value="cancelado"' +(p.status==='cancelado' ?' selected':'')+'>❌ Cancelado</option>'
-      +'</select>';
-
+    var dt = p.criado_em
+      ? new Date(p.criado_em).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})
+      : '—';
     var tr = document.createElement('tr');
-    tr.id = 'r'+p.id;
     tr.innerHTML =
       '<td class="tid">#'+p.id+'</td>'
-      +'<td class="tnome">'+esc(p.nome||'—')
-        +(p.observacao?'<div class="tobs">📝 '+esc(p.observacao)+'</div>':'')+
-      '</td>'
-      +'<td>'+wa+'</td>'
-      +'<td style="font-size:11px;color:var(--muted);max-width:150px">'+esc(p.endereco||'—')+'</td>'
-      +'<td class="titens">'+(iHtml||'—')+'</td>'
-      +'<td class="ttotal">R$ '+parseFloat(p.total||0).toFixed(2).replace('.',',')+'</td>'
-      +'<td><span class="pag">'+esc(p.pagamento||'—')+'</span></td>'
-      +'<td>'+sel+'</td>'
-      +'<td class="tdata">'+dt+'</td>'
-      +'<td><button class="del" onclick="del('+p.id+')">🗑</button></td>';
+      +'<td class="tnome">'+esc(p.nome||'—')+'</td>'
+      +'<td class="ttel">'+wa+'</td>'
+      +'<td class="tend">'+esc(p.endereco||'—')+'</td>'
+      +'<td class="tdata">'+dt+'</td>';
     tbody.appendChild(tr);
   });
 }
 
-/* ── AÇÕES ───────────────────────────────────────── */
-async function mudar(id, sel) {
-  var novo = sel.value;
-  sel.className = 'badge '+novo;
-  try {
-    await req('PATCH', '/pedidos?id=eq.'+id, {status:novo});
-    var i = todos.findIndex(function(p){return p.id===id});
-    if (i!==-1) todos[i].status = novo;
-    kpis();
-    toast('Status atualizado para '+novo);
-  } catch(e){ aviso('Erro ao atualizar: '+e.message); }
-}
-
-async function del(id) {
-  if (!confirm('Remover pedido #'+id+'?')) return;
-  try {
-    await req('DELETE', '/pedidos?id=eq.'+id);
-    todos = todos.filter(function(p){return p.id!==id});
-    kpis(); renderFiltrado();
-    toast('Pedido #'+id+' removido');
-  } catch(e){ aviso('Erro ao remover: '+e.message); }
-}
-
-/* ── CSV ─────────────────────────────────────────── */
+/* ── CSV ── */
 function csv() {
-  var st   = document.getElementById('fSt').value;
   var nome = document.getElementById('fNome').value.toLowerCase();
   var data = document.getElementById('fData').value;
   var lista = todos.filter(function(p){
-    return (!st||p.status===st)&&(!nome||(p.nome||'').toLowerCase().indexOf(nome)!==-1)&&(!data||(p.criado_em||'').indexOf(data)!==-1);
+    return (!nome||(p.nome||'').toLowerCase().indexOf(nome)!==-1)&&(!data||(p.criado_em||'').indexOf(data)!==-1);
   });
-  var rows = [['#','Nome','Telefone','Endereço','Total','Pagamento','Status','Data']];
+  var rows = [['#','Nome','Telefone','Endereço','Data']];
   lista.forEach(function(p){
     rows.push([p.id,p.nome||'',p.telefone||'',p.endereco||'',
-      parseFloat(p.total||0).toFixed(2),p.pagamento||'',p.status,
-      new Date(p.criado_em).toLocaleString('pt-BR')]);
+      p.criado_em?new Date(p.criado_em).toLocaleString('pt-BR'):'']);
   });
   var txt = rows.map(function(r){
     return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');
   }).join('\n');
   var a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,﻿'+encodeURIComponent(txt);
-  a.download = 'gelamour-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.download = 'gelamour-pedidos-'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
   toast('CSV exportado ('+lista.length+' pedidos)');
 }
 
-/* ── UI HELPERS ──────────────────────────────────── */
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function sync(txt){ document.getElementById('sync-txt').textContent = txt; }
-
-function aviso(msg){
-  var el = document.getElementById('aviso');
-  el.textContent = msg ? '⚠️ '+msg : '';
-  el.style.display = msg ? 'block' : 'none';
-}
-
-var _toastT;
-function toast(msg){
-  var el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('on');
-  clearTimeout(_toastT);
-  _toastT = setTimeout(function(){ el.classList.remove('on'); }, 3500);
-}
-
-function notif(msg){
-  if (Notification.permission==='granted') new Notification('Gelamour 🍰',{body:msg});
-  else if (Notification.permission!=='denied') Notification.requestPermission();
-}
-
-/* ── SOM DE NOTIFICAÇÃO ──────────────────────────── */
-function beep() {
-  try {
-    var ctx = new (window.AudioContext || window.webkitAudioContext)();
-    var o = ctx.createOscillator();
-    var g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.frequency.setValueAtTime(880, ctx.currentTime);
-    o.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-    g.gain.setValueAtTime(0.4, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    o.start(ctx.currentTime);
-    o.stop(ctx.currentTime + 0.4);
-  } catch(_) {}
-}
-
-// Chamar beep junto com toast de novo pedido
-var _toastOrig = toast;
-toast = function(msg) {
-  _toastOrig(msg);
-  if (msg.indexOf('Novo pedido') !== -1) beep();
-};
-
-/* ── ABAS ────────────────────────────────────────── */
-function mudarAba(aba, btn) {
-  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('ativo'); });
-  document.querySelectorAll('.tab-content').forEach(function(d){ d.classList.remove('ativo'); });
-  btn.classList.add('ativo');
-  document.getElementById('tab-'+aba).classList.add('ativo');
-  if (aba === 'cardapio') buscarProd();
-}
-
-/* ── PRODUTOS STATE ──────────────────────────────── */
-var prods = [];
-
-/* ── BUSCAR PRODUTOS ─────────────────────────────── */
+/* ── PRODUTOS ── */
 async function buscarProd() {
   document.getElementById('pLoading').style.display = 'block';
   document.getElementById('pTab').style.display = 'none';
@@ -570,7 +563,6 @@ function atualizarCats() {
   cats.forEach(function(c){ sel.innerHTML += '<option'+(c===val?' selected':'')+'>'+esc(c)+'</option>'; });
 }
 
-/* ── RENDER PRODUTOS ─────────────────────────────── */
 function renderProd() {
   var cat  = document.getElementById('pFiltCat').value;
   var nome = document.getElementById('pFiltNome').value.toLowerCase();
@@ -597,12 +589,14 @@ function renderProd() {
     var tr = document.createElement('tr');
     tr.innerHTML =
       '<td class="tid">#'+p.id+'</td>'
-      +'<td class="tnome">'+esc(p.nome||'—')+'</td>'
-      +'<td style="font-size:11px;color:var(--muted);max-width:200px">'+esc(p.descricao||'—')+'</td>'
+      +'<td>'
+        +'<div class="tnome">'+esc(p.nome||'—')+'</div>'
+        +(p.descricao?'<div style="font-size:11px;color:var(--muted);margin-top:3px">'+esc(p.descricao)+'</div>':'')
+      +'</td>'
       +'<td><span class="cat-tag">'+esc(p.categoria||'Outros')+'</span></td>'
       +'<td class="ttotal">R$ '+parseFloat(p.preco||0).toFixed(2).replace('.',',')+'</td>'
       +'<td style="text-align:center">'
-        +'<button class="disp-toggle'+(disp?' on':'')+'" title="'+(disp?'Disponível':'Oculto')+'" onclick="toggleDisp('+p.id+',this)"></button>'
+        +'<button class="disp-toggle'+(disp?' on':'')+'" title="'+(disp?'Clique para ocultar':'Clique para exibir')+'" onclick="toggleDisp('+p.id+',this)"></button>'
       +'</td>'
       +'<td style="white-space:nowrap">'
         +'<button class="btn sec" style="padding:4px 10px;font-size:12px;margin-right:6px" onclick="editarProd('+p.id+')">✏️ Editar</button>'
@@ -612,30 +606,29 @@ function renderProd() {
   });
 }
 
-/* ── TOGGLE DISPONÍVEL ───────────────────────────── */
 async function toggleDisp(id, btn) {
   var disp = !btn.classList.contains('on');
   btn.classList.toggle('on');
-  btn.title = disp ? 'Disponível' : 'Oculto';
+  btn.title = disp ? 'Clique para ocultar' : 'Clique para exibir';
   try {
     await req('PATCH', '/produtos?id=eq.'+id, {disponivel: disp});
     var i = prods.findIndex(function(p){ return p.id===id; });
     if (i!==-1) prods[i].disponivel = disp;
-    toast(disp ? '✅ Produto disponível no cardápio' : '🚫 Produto oculto do cardápio');
+    toast(disp ? '✅ Produto visível no cardápio' : '🚫 Produto oculto do cardápio');
   } catch(e) {
     btn.classList.toggle('on');
     aviso('Erro ao atualizar: '+e.message);
   }
 }
 
-/* ── MODAL ───────────────────────────────────────── */
+/* ── MODAL ── */
 function abrirModal(id) {
-  document.getElementById('pId').value   = id || '';
-  document.getElementById('pNome').value = '';
-  document.getElementById('pDesc').value = '';
-  document.getElementById('pCat').value  = 'Bolos';
+  document.getElementById('pId').value    = id || '';
+  document.getElementById('pNome').value  = '';
+  document.getElementById('pDesc').value  = '';
+  document.getElementById('pCat').value   = 'Brownies';
   document.getElementById('pPreco').value = '';
-  document.getElementById('pDisp').value = 'true';
+  document.getElementById('pDisp').value  = 'true';
   document.getElementById('modalTitulo').textContent = 'Novo Produto';
 
   if (id) {
@@ -650,7 +643,7 @@ function abrirModal(id) {
     }
   }
   document.getElementById('modalBg').classList.add('open');
-  document.getElementById('pNome').focus();
+  setTimeout(function(){ document.getElementById('pNome').focus(); }, 80);
 }
 
 function editarProd(id) { abrirModal(id); }
@@ -660,7 +653,6 @@ function fecharModal(e) {
   document.getElementById('modalBg').classList.remove('open');
 }
 
-/* ── SALVAR PRODUTO ──────────────────────────────── */
 async function salvarProd() {
   var id    = document.getElementById('pId').value;
   var nome  = document.getElementById('pNome').value.trim();
@@ -672,7 +664,7 @@ async function salvarProd() {
   if (!nome) { alert('Nome é obrigatório'); return; }
   if (isNaN(preco) || preco < 0) { alert('Preço inválido'); return; }
 
-  var body = { nome: nome, descricao: desc, categoria: cat, preco: preco, disponivel: disp };
+  var body = { nome:nome, descricao:desc||null, categoria:cat, preco:preco, disponivel:disp };
 
   try {
     if (id) {
@@ -683,7 +675,7 @@ async function salvarProd() {
     } else {
       var created = await req('POST', '/produtos', body);
       if (created && created[0]) prods.unshift(created[0]);
-      toast('✅ Produto adicionado!');
+      toast('✅ Produto adicionado ao cardápio!');
     }
     atualizarCats();
     renderProd();
@@ -691,27 +683,62 @@ async function salvarProd() {
   } catch(e) { aviso('Erro ao salvar: '+e.message); }
 }
 
-/* ── DELETAR PRODUTO ─────────────────────────────── */
 async function delProd(id) {
   var p = prods.find(function(x){ return x.id===id; });
-  if (!confirm('Remover "'+( p ? p.nome : '#'+id)+'" do cardápio?')) return;
+  if (!confirm('Remover "'+( p ? p.nome : '#'+id)+'" do cardápio?\nEssa ação não pode ser desfeita.')) return;
   try {
     await req('DELETE', '/produtos?id=eq.'+id);
-    prods = prods.filter(function(p){ return p.id!==id; });
+    prods = prods.filter(function(x){ return x.id!==id; });
     atualizarCats();
     renderProd();
     toast('🗑 Produto removido');
   } catch(e) { aviso('Erro ao remover: '+e.message); }
 }
 
-/* ── BOOT ────────────────────────────────────────── */
-buscar();
-setInterval(buscar, POLL);
-
-// PWA Service Worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(function(){});
+/* ── HELPERS ── */
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function sync(txt){ document.getElementById('sync-txt').textContent = txt; }
+function aviso(msg){
+  var el = document.getElementById('aviso');
+  el.textContent = msg ? '⚠️ '+msg : '';
+  el.style.display = msg ? 'block' : 'none';
 }
+var _toastT;
+function toast(msg){
+  var el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(function(){ el.classList.remove('on'); }, 3500);
+}
+function notif(msg){
+  if (Notification.permission==='granted') new Notification('Gelamour 🍰',{body:msg});
+  else if (Notification.permission!=='denied') Notification.requestPermission();
+}
+function beep() {
+  try {
+    var ctx = new (window.AudioContext||window.webkitAudioContext)();
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.setValueAtTime(880, ctx.currentTime);
+    o.frequency.setValueAtTime(1100, ctx.currentTime+0.1);
+    g.gain.setValueAtTime(0.4, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+0.4);
+    o.start(); o.stop(ctx.currentTime+0.4);
+  } catch(_){}
+}
+
+/* ── BOOT ── */
+function iniciar() {
+  buscarProd();
+  kpis();
+  setInterval(function(){
+    var abaAtiva = document.querySelector('.tab-content.ativo');
+    if (abaAtiva && abaAtiva.id === 'tab-pedidos') buscar();
+  }, POLL);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+
+verificarSessao();
 </script>
 </body>
 </html>
