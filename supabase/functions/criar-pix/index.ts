@@ -41,6 +41,7 @@ serve(async (req) => {
         dueDate,
         description: `Pedido Gelamour #${pedido_id} — ${nome}`,
         externalReference: String(pedido_id),
+        notificationDisabled: true,
       }),
     })
     const charge = await payResp.json()
