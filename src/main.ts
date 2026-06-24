@@ -29,6 +29,8 @@ const EDGE_URL = `${SUPABASE_URL}/functions/v1`;
 // ===== ESTADO LOCAL DE UI (não global — encapsulado) =====
 let _pixPayload = '';
 let _pixPollTimer: ReturnType<typeof setInterval> | null = null;
+let _pixPollTimeoutTimer: ReturnType<typeof setTimeout> | null = null; // limite 30min
+let _pixCancelled = false; // flag para evitar race condition no timer
 let _pixPedidoId: number | null = null;
 let _pixMsgWA = '';
 let _pixTotal = 0;
@@ -407,6 +409,8 @@ async function iniciarFluxoPix(
 
   if (!isPix) return;
 
+  _pixCancelled = false;
+
   try {
     const resp = await fetch(EDGE_URL + '/criar-pix', {
       method: 'POST',
@@ -416,12 +420,28 @@ async function iniciarFluxoPix(
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json() as { error?: string; qr_code?: string; qr_code_image?: string };
     if (data.error) throw new Error(data.error);
+
+    // Race condition: usuário cancelou enquanto aguardávamos a Edge Function
+    if (_pixCancelled) return;
+
     _pixPayload = data.qr_code || '';
     if (pixCodeBox) pixCodeBox.textContent = _pixPayload || 'Código indisponível';
     if (data.qr_code_image && pixQrImg) pixQrImg.src = 'data:image/png;base64,' + data.qr_code_image;
     if (pixStatus) { pixStatus.textContent = '⏳ Aguardando pagamento...'; pixStatus.className = 'pix-status pix-aguardando'; }
-    if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'none';
+    // Mostrar botão "Já Paguei" após 20s — fallback se detecção automática falhar
+    if (pixJaPagueiBtn) {
+      pixJaPagueiBtn.style.display = 'none';
+      setTimeout(() => {
+        if (!_pixCancelled && pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
+      }, 20_000);
+    }
     _pixPollTimer = setInterval(verificarPagamentoPix, 4000);
+    // Timeout de 30 min — cancela polling se ninguém pagar
+    _pixPollTimeoutTimer = setTimeout(() => {
+      if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
+      if (pixStatus) { pixStatus.textContent = '⏰ Tempo esgotado. Gere um novo Pix se precisar.'; pixStatus.className = 'pix-status'; }
+      if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
+    }, 30 * 60 * 1000);
   } catch (e) {
     log.warn('Erro ao criar Pix', { error: String(e) });
     if (pixCodeBox) pixCodeBox.textContent = 'Erro ao gerar código.';
@@ -499,17 +519,18 @@ function mostrarReciboPix(): void {
       '</div>' +
       '<button onclick="fecharReciboPix()" style="width:100%;padding:13px;background:linear-gradient(135deg,#E8528A,#C23A6E);color:#fff;font-weight:700;font-size:15px;border:none;border-radius:12px;cursor:pointer;font-family:inherit">💬 Ver pedido no WhatsApp</button>';
   }
-  setTimeout(() => {
-    window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(_pixMsgWA), '_blank');
-  }, 2000);
 }
 
 function fecharReciboPix(): void {
-  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(_pixMsgWA), '_blank');
+  const msgWA = _pixMsgWA;
+  _pixCancelled = true;
+  if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
+  if (_pixPollTimeoutTimer) { clearTimeout(_pixPollTimeoutTimer); _pixPollTimeoutTimer = null; }
   document.getElementById('pixBackdrop')?.classList.remove('aberto');
   limparCarrinho();
   _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0; _pixNome = '';
   _pixItens = []; _pixEndereco = '';
+  if (msgWA) window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msgWA), '_blank');
 }
 
 function copiarPix(): void {
@@ -530,7 +551,9 @@ function copiarPix(): void {
 }
 
 function cancelarPix(): void {
+  _pixCancelled = true;
   if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
+  if (_pixPollTimeoutTimer) { clearTimeout(_pixPollTimeoutTimer); _pixPollTimeoutTimer = null; }
   const estaAberto = document.getElementById('pixBackdrop')?.classList.contains('aberto') ?? false;
   document.getElementById('pixBackdrop')?.classList.remove('aberto');
   _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0; _pixNome = '';
