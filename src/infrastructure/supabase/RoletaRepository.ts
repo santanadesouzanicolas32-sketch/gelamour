@@ -1,7 +1,7 @@
 import type { IRoletaRepository } from '../../repositories/IRoletaRepository';
 import type { ParticipacaoProps } from '../../domain/roleta';
 import { tryAsync, type Result } from '../../core/result';
-import { supabaseGet, supabasePost } from './client';
+import { supabaseGet, supabasePost, supabasePatch } from './client';
 import { logger } from '../../core/logger';
 
 const log = logger.child('RoletaRepo');
@@ -24,6 +24,18 @@ export class RoletaRepository implements IRoletaRepository {
   async saveParticipacao(
     data: Partial<ParticipacaoProps>
   ): Promise<Result<ParticipacaoProps>> {
+    // Se tem id, faz PATCH; senão INSERT
+    if (data.id !== undefined) {
+      return tryAsync(async () => {
+        const { id, ...patch } = data;
+        const rows = await supabasePatch<ParticipacaoProps>(
+          'roleta_participacoes',
+          `id=eq.${id}`,
+          patch
+        );
+        return (rows[0] ?? { ...data }) as ParticipacaoProps;
+      });
+    }
     return tryAsync(() =>
       supabasePost<ParticipacaoProps>('roleta_participacoes', data)
     );

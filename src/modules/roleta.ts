@@ -1,9 +1,13 @@
-import type { RoletaConfig, Participacao, Vencedor, Cliente } from '../types';
-import { dbGet, dbPost, dbPatch } from '../services/supabase';
+import type { RoletaConfig } from '../types';
+import { roletaRepository } from '../container';
+import { RoletaDomain } from '../domain/roleta';
+import { supabaseGet } from '../infrastructure/supabase/client';
 import { getSemanaAtual } from '../utils/format';
 import { escHTML } from '../utils/security';
 import { mostrarToast } from '../utils/toast';
-import { isContaTeste } from '../services/auth';
+import { isContaTeste } from '../state/AppStore';
+import { appStore } from '../state/AppStore';
+import type { Cliente } from '../types';
 
 const PREMIOS_PADRAO: string[] = [
   '🎁 5% OFF — Compras acima de R$35',
@@ -28,7 +32,7 @@ export function isGirando(): boolean { return _girando; }
 
 export async function carregarConfig(): Promise<RoletaConfig | null> {
   try {
-    const rows = await dbGet<RoletaConfig>('roleta_config', 'id=eq.1&limit=1');
+    const rows = await supabaseGet<RoletaConfig>('roleta_config', 'id=eq.1&limit=1');
     if (rows[0]) {
       _premios = Array.isArray(rows[0].premios) ? rows[0].premios : PREMIOS_PADRAO;
     }
@@ -36,17 +40,12 @@ export async function carregarConfig(): Promise<RoletaConfig | null> {
   } catch { return null; }
 }
 
-export async function verificarStatus(clienteId: number): Promise<Participacao | null> {
-  try {
-    const rows = await dbGet<Participacao>(
-      'roleta_participacoes',
-      `cliente_id=eq.${clienteId}&order=created_at.desc&limit=1`
-    );
-    if (rows[0]) {
-      _participacaoId = rows[0].id;
-    }
-    return rows[0] ?? null;
-  } catch { return null; }
+export async function verificarStatus(clienteId: number): Promise<import('../domain/roleta').ParticipacaoProps | null> {
+  const semana = getSemanaAtual();
+  const result = await roletaRepository.findParticipacaoAtiva(String(clienteId), semana);
+  if (!result.ok) return null;
+  if (result.value) _participacaoId = result.value.id;
+  return result.value;
 }
 
 export async function girar(
@@ -55,7 +54,8 @@ export async function girar(
 ): Promise<void> {
   if (_girando) return;
 
-  if (!isContaTeste(cliente)) {
+  const state = appStore.getState();
+  if (!isContaTeste(state.cliente)) {
     mostrarToast('🚧 Roleta em breve! Estamos finalizando os últimos detalhes. 🎡', 'info');
     return;
   }
@@ -87,31 +87,38 @@ export async function girar(
 
   onResultado(premio, indice);
 
-  if (isContaTeste(cliente) && btn) {
+  if (isContaTeste(state.cliente) && btn) {
     btn.disabled = false;
     btn.textContent = '🎡 GIRAR AGORA!';
   }
 }
 
 export async function salvarVencedor(cliente: Cliente, premio: string): Promise<void> {
-  if (isContaTeste(cliente)) return;
+  if (isContaTeste(appStore.getState().cliente)) return;
   if (!_participacaoId) return;
-  try {
-    const semana = getSemanaAtual();
-    await dbPatch<Participacao>('roleta_participacoes', `id=eq.${_participacaoId}`, {
-      ja_girou: true,
-      premio,
-    });
-    await dbPost<Vencedor>('roleta_vencedores', {
-      participacao_id: _participacaoId,
-      cliente_id: cliente.id,
-      nome: cliente.nome,
-      telefone: cliente.telefone,
-      premio,
-      semana,
-    } as Partial<Vencedor>);
-  } catch (e) {
-    console.error('Erro ao salvar vencedor:', e);
+
+  const semana = getSemanaAtual();
+
+  const patchResult = await roletaRepository.saveParticipacao({
+    id: _participacaoId,
+    ja_girou: true,
+    premio,
+  } as import('../domain/roleta').ParticipacaoProps);
+
+  if (!patchResult.ok) {
+    console.error('Erro ao atualizar participação:', patchResult.error);
+    return;
+  }
+
+  const vencedorResult = await roletaRepository.saveVencedor(
+    cliente.telefone,
+    cliente.nome,
+    premio,
+    semana
+  );
+
+  if (!vencedorResult.ok) {
+    console.error('Erro ao salvar vencedor:', vencedorResult.error);
   }
 }
 
