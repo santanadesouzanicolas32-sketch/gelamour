@@ -1,5 +1,7 @@
 
     const WA_NUMBER = atob('NTUxMTk0MDc3Mjc1MA==');
+    const CONTA_TESTE = atob('MTE5NjUwMzAwNzY=');
+    function isContaTeste() { return clienteAtual && clienteAtual.telefone.replace(/D/g,'') === CONTA_TESTE; }
 
     const carrinho = {};
     let pagamentoSelecionado = '';
@@ -1061,7 +1063,7 @@ Pedido pelo cardápio online ✨`;
           jaGirou.style.display = 'none';
           if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
         }
-      } else if (info.ja_girou) {
+      } else if (info.ja_girou && !isContaTeste()) {
         statusBox.innerHTML = '';
         instrucoes.style.display = 'none';
         btnEnviar.style.display = 'none';
@@ -1136,7 +1138,8 @@ Pedido pelo cardápio online ✨`;
       if (!canvas || !btn) return;
       canvas.style.transformOrigin = 'center center';
 
-      // Verificar limite de vencedores na semana atual (regra inviolável)
+      // Verificar limite de vencedores (conta teste tem giros infinitos)
+      if (!isContaTeste()) {
       try {
         const semana = getSemanaAtual();
         const resp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_vencedores?semana=eq.${semana}&select=id`, {
@@ -1156,7 +1159,7 @@ Pedido pelo cardápio online ✨`;
           document.getElementById('roletaResultado').classList.add('visivel');
           return;
         }
-      } catch(e) { console.warn('Erro ao verificar limite semanal:', e); }
+      } catch(e) { console.warn('Erro ao verificar limite semanal:', e); } }
 
       _roletaGirandoFlag = true;
       btn.disabled = true;
@@ -1199,6 +1202,7 @@ Pedido pelo cardápio online ✨`;
 
     async function salvarVencedor(premio) {
       if (!clienteAtual || !_roletaParticipacaoId) return;
+      if (isContaTeste()) return; // conta teste: não registra no banco
       try {
         // Marcar participação como já girou
         await dbPatch('roleta_participacoes', 'id=eq.' + _roletaParticipacaoId, {
