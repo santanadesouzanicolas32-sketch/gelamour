@@ -940,10 +940,10 @@ Pedido pelo cardápio online ✨`;
       document.getElementById('roletaWheelSection').style.display = 'block';
 
       if (!clienteAtual) {
-        document.getElementById('roletaNaoLogado').style.display = 'block';
+        document.getElementById('roletaNaoLogado').style.display = 'none';
         document.getElementById('roletaInstrucoes').style.display = 'none';
         const girarBtn = document.getElementById('roletaGirarBtn');
-        if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; girarBtn.textContent = '🔒 Faça login para girar'; }
+        if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
         return;
       }
 
@@ -1033,6 +1033,14 @@ Pedido pelo cardápio online ✨`;
         jaGirou.style.display = "none";
         return;
       }
+
+      // Roleta em desenvolvimento: botão visível mas bloqueado no clique
+      if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = "1"; girarBtn.textContent = "🎡 GIRAR AGORA!"; }
+      statusBox.innerHTML = "";
+      instrucoes.style.display = "none";
+      btnEnviar.style.display = "none";
+      jaGirou.style.display = "none";
+      return;
 
       if (!info) {
         statusBox.innerHTML = '';
@@ -1260,6 +1268,12 @@ Pedido pelo cardápio online ✨`;
       if (_roletaGirandoFlag) return;
       const btn = document.getElementById('roletaGirarBtn');
       if (!btn) return;
+
+      // Roleta em desenvolvimento — só conta teste pode girar
+      if (!isContaTeste()) {
+        mostrarToast('🚧 Roleta em breve! Estamos finalizando os últimos detalhes para você. 🎡', 'info');
+        return;
+      }
 
       // Verificar limite de vencedores (conta teste tem giros infinitos)
       if (!isContaTeste()) {
