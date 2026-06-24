@@ -10,9 +10,10 @@ except ImportError:
     print("Instale as dependencias: pip install -r requirements.txt")
     sys.exit(1)
 
-# Configurar antes de usar
-SUPABASE_URL = input("URL do Supabase (ex: https://xxx.supabase.co): ").strip()
-SUPABASE_KEY = input("Anon key do Supabase: ").strip()
+# Configurar antes de usar (env vars têm prioridade; fallback para input interativo)
+import os
+SUPABASE_URL = os.environ.get('SUPABASE_URL') or input("URL do Supabase (ex: https://xxx.supabase.co): ").strip()
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY') or input("Anon key do Supabase: ").strip()
 
 HEADERS = {
     "apikey": SUPABASE_KEY,

@@ -420,6 +420,8 @@ Pedido pelo cardápio online ✨`;
     }
 
     async function pagarCartao() {
+      mostrarToast('💳 Pagamento por cartão em breve! Use o Pix por enquanto.', 'info');
+      return;
       const numero = document.getElementById('cardNumero').value.replace(/\s/g, '');
       const nomeCartao = document.getElementById('cardNome').value.trim().toUpperCase();
       const cpf = document.getElementById('cardCpf').value.replace(/\D/g, '');
@@ -563,6 +565,22 @@ Pedido pelo cardápio online ✨`;
       document.getElementById('pixBackdrop').classList.remove('aberto');
       _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0; _pixNome = ''; _pixItens = []; _pixEndereco = '';
       if (estaAberto) abrirModal();
+    }
+
+    function pixJaPaguei() {
+      cancelarPix();
+      finalizarPedidoWhatsApp();
+    }
+
+    function finalizarPedidoWhatsApp() {
+      const itens = Object.values(carrinho);
+      if (itens.length === 0) { mostrarToast('Carrinho vazio', 'erro'); return; }
+      const nome = document.getElementById('inpNome') ? document.getElementById('inpNome').value.trim() : '';
+      const endereco = document.getElementById('inpEndereco') ? document.getElementById('inpEndereco').value.trim() : '';
+      const total = itens.reduce((s, i) => s + i.preco, 0);
+      const linhas = itens.map(i => `▸ ${i.nome} — R$ ${i.preco.toFixed(2).replace('.', ',')} `).join('\n');
+      const msg = `🛒 *PEDIDO GELAMOUR* (Pix enviado manualmente)\n\n${linhas}\n\n*Total: R$ ${total.toFixed(2).replace('.', ',')}*\n\n👤 ${nome}\n📍 ${endereco}\n\n_Confirmando envio do pagamento Pix._`;
+      window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
     }
 
     function limparCarrinho() {

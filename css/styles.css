@@ -1659,19 +1659,7 @@
       display: inline-block;
     }
 
-    .roleta-ponteiro {
-      position: absolute;
-      top: -14px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0;
-      height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-top: 22px solid var(--rosa);
-      z-index: 10;
-      filter: drop-shadow(0 2px 4px rgba(232, 82, 138, 0.6));
-    }
+    /* .roleta-ponteiro removido — classe morta, HTML usa .roleta-ponteiro-fixo */
 
 /* ── Roleta SVG ── */
 #roletaCanvas {
