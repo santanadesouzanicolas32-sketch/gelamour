@@ -31,6 +31,9 @@ Thumbs.db
 logo_b64.txt
 logo_temp.jpg
 
+# Python
+*.pyc
+__pycache__/
+
 # Pacotes (não precisam ser commitados para site estático)
 package-lock.json
-package.json

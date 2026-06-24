@@ -1,4 +1,4 @@
-var CACHE = 'gelamour-v4';
+var CACHE = 'gelamour-v5';
 var ASSETS = [
   '/gelamour/index.html',
   '/gelamour/manifest.json',

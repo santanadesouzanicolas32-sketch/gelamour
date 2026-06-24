@@ -1,0 +1,12 @@
+{
+  "name": "gelamour",
+  "version": "1.0.0",
+  "description": "Cardápio online Gelamour",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
