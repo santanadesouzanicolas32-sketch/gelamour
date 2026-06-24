@@ -897,12 +897,12 @@ Pedido pelo cardápio online ✨`;
     // ===================== ROLETA VIP =====================
 
     const ROLETA_PREMIOS_PADRAO = [
-      '5% OFF — Compras acima de R$35',
-      'Brownie Tradicional Grátis — Compras acima de R$50',
-      '10% OFF — Compras acima de R$50',
-      'Siga a Gelamour no Instagram',
-      'Compre 2 e Leve — Até R$14 em produtos',
-      'Não Foi Dessa Vez — Ganha 5% OFF acima de R$35'
+      '🎁 5% OFF — Compras acima de R$35',
+      '🍫 Brownie Tradicional Grátis — Compras acima de R$50',
+      '🎁 10% OFF — Compras acima de R$50',
+      '📸 Siga a Gelamour no Instagram',
+      '🛍️ Compre 2 e Leve — Até R$14 em produtos',
+      '😕 Não Foi Dessa Vez — Ganha 5% OFF acima de R$35'
     ];
     let _roletaPremios = ROLETA_PREMIOS_PADRAO.slice();
     let _roletaGirandoFlag = false;
@@ -1146,16 +1146,16 @@ Pedido pelo cardápio online ✨`;
       if (old) old.remove();
 
       const N = premios.length;
-      const CX = 200, CY = 200, R = 166, R_LED = 183, R_OUTER = 196;
+      const CX = 200, CY = 200, R = 164, R_LED = 182, R_OUTER = 196;
       const SEG = 360 / N;
       const CORES = [
         { bg: '#FAF0F2', txt: '#B5134F' },
         { bg: '#E8528A', txt: '#FFFFFF' },
       ];
-      const EMOJIS = ['🎁','🍫','🎁','📸','🛍️','😕'];
 
       function rad(d) { return d * Math.PI / 180; }
       function pt(d, r) { return [CX + r * Math.cos(rad(d)), CY + r * Math.sin(rad(d))]; }
+      function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
       function segPath(i) {
         const s = SEG * i - 90, e = s + SEG;
@@ -1167,49 +1167,60 @@ Pedido pelo cardápio online ✨`;
         const words = text.split(' ');
         const lines = []; let cur = '';
         words.forEach(w => {
-          if ((cur+' '+w).trim().length > maxChars) { if(cur) lines.push(cur.trim()); cur = w; }
-          else cur = (cur+' '+w).trim();
+          const test = cur ? cur + ' ' + w : w;
+          if (test.length > maxChars && cur) { lines.push(cur); cur = w; }
+          else cur = test;
         });
-        if (cur) lines.push(cur.trim());
-        return lines.slice(0,3);
+        if (cur) lines.push(cur);
+        return lines.slice(0, 3);
       }
 
       // Segments
       const segs = premios.map((p,i) => {
         const c = CORES[i%2];
-        return `<path d="${segPath(i)}" fill="${c.bg}" stroke="#D4AF37" stroke-width="2.5"/>`;
+        return `<path d="${segPath(i)}" fill="${c.bg}" stroke="#D4AF37" stroke-width="2" shape-rendering="geometricPrecision"/>`;
       }).join('');
 
-      // Gold spoke lines
+      // Gold divider lines
       const spokes = premios.map((_,i) => {
         const d = SEG * i - 90;
         const [x,y] = pt(d, R);
         return `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}" stroke="#D4AF37" stroke-width="2"/>`;
       }).join('');
 
-      // Text + emoji
+      // Text blocks per segment
       const texts = premios.map((p,i) => {
-        const mid = SEG * i - 90 + SEG/2;
-        const [tx,ty] = pt(mid, R*0.58);
+        const mid = SEG * i - 90 + SEG / 2;
+        const [tx,ty] = pt(mid, R * 0.57);
         const c = CORES[i%2];
-        const lines = wrapWords(p.replace(/^[^\s]+\s/,''), 13);
-        const totalH = lines.length * 13;
-        const emojiY = -totalH/2 - 10;
-        return `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)}) rotate(${(mid+90).toFixed(1)})">
-      <text x="0" y="${emojiY.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="15" font-family="serif">${EMOJIS[i]}</text>
-      ${lines.map((l,li) => `<text x="0" y="${((li-(lines.length-1)/2)*13+3).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${c.txt}" font-family="'DM Sans',Arial,sans-serif" font-weight="700" font-size="9.5">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>`).join('')}
-    </g>`;
+        // Split: first non-space token = emoji, rest = text
+        const m = p.match(/^(\S+)\s+(.+)$/);
+        const emoji = m ? m[1] : '';
+        const rest  = m ? m[2] : p;
+        const lines = wrapWords(rest, 13);
+        const lineH = 11.5;
+        const totalTxtH = lines.length * lineH;
+        const emojiY = -(totalTxtH / 2) - 11;
+        const rot = (mid + 90).toFixed(1);
+        return `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)}) rotate(${rot})" text-rendering="geometricPrecision">
+  <text x="0" y="${emojiY.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="15" font-family="serif">${esc(emoji)}</text>
+  ${lines.map((l,li) => {
+    const yp = ((li - (lines.length - 1) / 2) * lineH).toFixed(1);
+    return `<text x="0" y="${yp}" text-anchor="middle" dominant-baseline="middle" fill="${c.txt}" font-family="'DM Sans',Arial,sans-serif" font-weight="700" font-size="9">${esc(l)}</text>`;
+  }).join('\n  ')}
+</g>`;
       }).join('');
 
-      // LED lights
+      // LED ring
       const LED_N = 30;
-      const leds = Array.from({length:LED_N},(_,i)=>{
-        const [lx,ly] = pt((360/LED_N)*i-90, R_LED);
+      const leds = Array.from({length: LED_N}, (_,i) => {
+        const [lx,ly] = pt((360/LED_N)*i - 90, R_LED);
         return `<circle cx="${lx.toFixed(2)}" cy="${ly.toFixed(2)}" r="5.5" class="r-led r-led-${i%2}"/>`;
       }).join('');
 
-      const svg = `<svg id="roletaCanvas" viewBox="0 0 400 400" width="330" height="330"
-    xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;filter:drop-shadow(0 8px 24px rgba(0,0,0,.45))">
+      const svg = `<svg id="roletaCanvas" viewBox="0 0 400 400"
+  style="width:min(86vw,340px);height:min(86vw,340px);display:block;filter:drop-shadow(0 6px 20px rgba(0,0,0,.42))"
+  xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="rg-ring" cx="50%" cy="50%" r="50%">
       <stop offset="70%" stop-color="#D42B73"/>
@@ -1221,26 +1232,23 @@ Pedido pelo cardápio online ✨`;
       <stop offset="100%" stop-color="#7A5800"/>
     </radialGradient>
     <filter id="f-glow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <!-- Outer ring -->
   <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="url(#rg-ring)"/>
   <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="none" stroke="#D4AF37" stroke-width="3.5"/>
-  <!-- WHEEL (rotates) -->
   <g id="roletaRoda">
-    ${segs}${spokes}${texts}
+    ${segs}
+    ${spokes}
+    ${texts}
   </g>
-  <!-- Inner gold border (static) -->
   <circle cx="${CX}" cy="${CY}" r="${R+1}" fill="none" stroke="#D4AF37" stroke-width="3"/>
-  <!-- LEDs (static) -->
   ${leds}
-  <!-- Center -->
   <circle cx="${CX}" cy="${CY}" r="42" fill="url(#rg-ctr)" stroke="#FFF" stroke-width="3.5" filter="url(#f-glow)"/>
   <circle cx="${CX}" cy="${CY}" r="38" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>
-  <text x="${CX}" y="${CY-6}" text-anchor="middle" dominant-baseline="middle" fill="#FFF" font-family="'DM Sans',Arial,sans-serif" font-weight="800" font-size="12.5" letter-spacing="1.5">GIRAR</text>
-  <text x="${CX}" y="${CY+10}" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.85)" font-family="serif" font-size="11">★ ★ ★</text>
+  <text x="${CX}" y="${CY-7}" text-anchor="middle" dominant-baseline="middle" fill="#FFF" font-family="'DM Sans',Arial,sans-serif" font-weight="800" font-size="12" letter-spacing="1.5" text-rendering="geometricPrecision">GIRAR</text>
+  <text x="${CX}" y="${CY+9}" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.85)" font-family="serif" font-size="11">★ ★ ★</text>
 </svg>`;
 
       const div = document.createElement('div');

@@ -1673,13 +1673,15 @@
       filter: drop-shadow(0 2px 4px rgba(232, 82, 138, 0.6));
     }
 
-    #roletaCanvas {
+/* ── Roleta SVG ── */
+#roletaCanvas {
   display: block;
   user-select: none;
-  pointer-events: none;
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+  width: min(86vw, 340px);
+  height: min(86vw, 340px);
 }
-
-/* ── Roleta SVG ── */
 .r-led {
   fill: #FFF8DC;
 }
@@ -1690,11 +1692,17 @@
   animation: rLedBlink 1s ease-in-out infinite 0.5s;
 }
 @keyframes rLedBlink {
-  0%, 100% { fill: #FFF8DC; opacity: 1; filter: drop-shadow(0 0 4px #FFD700); }
-  50%       { fill: #FFD700; opacity: 0.55; filter: drop-shadow(0 0 8px #FF8C00); }
+  0%, 100% { fill: #FFF8DC; opacity: 1; filter: drop-shadow(0 0 5px #FFD700); }
+  50%       { fill: #FFD700; opacity: 0.5;  filter: drop-shadow(0 0 9px #FF8C00); }
 }
 #roletaRoda {
   transform-origin: 200px 200px;
+}
+.roleta-pointer-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
     .roleta-girar-btn {
