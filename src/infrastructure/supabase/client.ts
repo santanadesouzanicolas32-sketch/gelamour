@@ -45,7 +45,10 @@ export async function supabaseGet<T>(
   query = ''
 ): Promise<T[]> {
   const resp = await supabaseFetch(`/rest/v1/${table}${query ? '?' + query : ''}`);
-  if (!resp.ok) throw new NetworkError(`GET ${table} falhou`, { status: resp.status });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new NetworkError(`GET ${table} falhou (${resp.status})`, { status: resp.status, body });
+  }
   return resp.json() as Promise<T[]>;
 }
 

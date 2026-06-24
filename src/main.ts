@@ -589,7 +589,11 @@ async function verificarTelefone(): Promise<void> {
   try {
     const result = await loginUseCase.execute(telInput.value);
     if (!result.ok) {
-      if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
+      const msg = result.error.name === 'NetworkError'
+        ? 'Sem conexão. Verifique sua internet e tente novamente.'
+        : result.error.message;
+      log.error('verificarTelefone falhou', { error: result.error.message });
+      if (erro) { erro.textContent = msg; erro.style.display = 'block'; }
       return;
     }
     if (result.value.existe && result.value.cliente) {
