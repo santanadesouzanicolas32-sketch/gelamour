@@ -710,7 +710,9 @@ Pedido pelo cardápio online ✨`;
       el.value = v;
     }
 
-    let _verificando = false;
+    let _loginTentativas = 0;
+    let _loginBloqueioAte = 0;
+        let _verificando = false;
     async function verificarTelefone() {
       if (_verificando) return;
       const tel = document.getElementById('loginTelefone').value.replace(/\D/g, '');
@@ -732,6 +734,8 @@ Pedido pelo cardápio online ✨`;
           document.getElementById('loginNome').focus();
         }
       } catch (e) {
+        _loginTentativas++;
+        if (_loginTentativas >= 5) { _loginBloqueioAte = Date.now() + 60000; _loginTentativas = 0; }
         erro.textContent = 'Sem conexão ou erro no servidor. Tente novamente.';
         erro.style.display = 'block';
       } finally {
@@ -775,6 +779,7 @@ Pedido pelo cardápio online ✨`;
     function entrarComCliente(cliente) {
       clienteAtual = cliente;
       sessionStorage.setItem('gelamour_tel', cliente.telefone);
+      sessionStorage.setItem('gelamour_ts', Date.now());
 
       document.getElementById('loginOverlay').style.display = 'none';
       document.getElementById('usuarioBar').style.display = 'inline-flex';
@@ -1300,7 +1305,7 @@ Pedido pelo cardápio online ✨`;
         if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum aprovado ainda.</div>'; return; }
         el.innerHTML = data.map(function(p) {
           const dt = p.data_aprovacao ? new Date(p.data_aprovacao).toLocaleString('pt-BR') : '—';
-          const girou = p.ja_girou ? '✓ Girou — ' + (p.premio || '') : '⏳ Aguardando girar';
+          const girou = p.ja_girou ? '✓ Girou — ' + escHTML(p.premio || '') : '⏳ Aguardando girar';
           return '<div class="roleta-participante-item">' +
             '<div class="roleta-participante-info">' +
               '<div class="roleta-participante-nome">' + escHTML(p.nome) + '</div>' +

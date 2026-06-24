@@ -1,9 +1,13 @@
-var CACHE = 'gelamour-v3';
+var CACHE = 'gelamour-v4';
 var ASSETS = [
   '/gelamour/index.html',
   '/gelamour/manifest.json',
+  '/gelamour/css/styles.css',
+  '/gelamour/js/app.js',
   '/gelamour/icon-192.png',
-  '/gelamour/icon-512.png'
+  '/gelamour/icon-512.png',
+  '/gelamour/images/logo.webp',
+  '/gelamour/images/roleta.webp'
 ];
 
 self.addEventListener('install', function(e) {
