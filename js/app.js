@@ -897,12 +897,12 @@ Pedido pelo cardápio online ✨`;
     // ===================== ROLETA VIP =====================
 
     const ROLETA_PREMIOS_PADRAO = [
-      '5% OFF na próxima compra acima de R$35',
-      'Brownie Tradicional Grátis',
-      '10% OFF na próxima compra acima de R$50',
-      'Sigam a Gelamour no Instagram',
-      'Compre 2 e Leve até R$14 de produtos',
-      'Não Foi Dessa Vez… mas ganhou 5% OFF acima de R$35'
+      '5% OFF — Compras acima de R$35',
+      'Brownie Tradicional Grátis — Compras acima de R$50',
+      '10% OFF — Compras acima de R$50',
+      'Siga a Gelamour no Instagram',
+      'Compre 2 e Leve — Até R$14 em produtos',
+      'Não Foi Dessa Vez — Ganha 5% OFF acima de R$35'
     ];
     let _roletaPremios = ROLETA_PREMIOS_PADRAO.slice();
     let _roletaGirandoFlag = false;
@@ -1138,164 +1138,120 @@ Pedido pelo cardápio online ✨`;
       }
     }
 
-    // ── Roleta Canvas Profissional ──────────────────────────────────────
-    const ROLETA_CORES = [
-      { fundo: '#FAF0F2', texto: '#C23A6E' },
-      { fundo: '#E8528A', texto: '#FFFFFF' },
-    ];
-    const ROLETA_ICONES = ['💸','🍫','💰','📱','🛍️','😊'];
-
+    // ── Roleta SVG Profissional ──────────────────────────────────────
     function desenharRoleta(premios) {
-      const canvas = document.getElementById('roletaCanvas');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const W = canvas.width, H = canvas.height;
-      const cx = W / 2, cy = H / 2;
-      const n = premios.length;
-      const arc = (2 * Math.PI) / n;
-      ctx.clearRect(0, 0, W, H);
+      const wrap = document.querySelector('.roleta-pointer-wrap');
+      if (!wrap) return;
+      const old = document.getElementById('roletaCanvas');
+      if (old) old.remove();
 
-      // Anel externo
-      const outerGrad = ctx.createRadialGradient(cx, cy, cx * 0.72, cx, cy, cx - 1);
-      outerGrad.addColorStop(0, '#E8528A');
-      outerGrad.addColorStop(1, '#9C1C4A');
-      ctx.beginPath();
-      ctx.arc(cx, cy, cx - 1, 0, 2 * Math.PI);
-      ctx.fillStyle = outerGrad;
-      ctx.fill();
+      const N = premios.length;
+      const CX = 200, CY = 200, R = 166, R_LED = 183, R_OUTER = 196;
+      const SEG = 360 / N;
+      const CORES = [
+        { bg: '#FAF0F2', txt: '#B5134F' },
+        { bg: '#E8528A', txt: '#FFFFFF' },
+      ];
+      const EMOJIS = ['🎁','🍫','🎁','📸','🛍️','😕'];
 
-      // Segmentos
-      const segR = cx - 26;
-      premios.forEach(function(premio, i) {
-        const start = arc * i - Math.PI / 2;
-        const end = start + arc;
-        const cor = ROLETA_CORES[i % 2];
+      function rad(d) { return d * Math.PI / 180; }
+      function pt(d, r) { return [CX + r * Math.cos(rad(d)), CY + r * Math.sin(rad(d))]; }
 
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, segR, start, end);
-        ctx.closePath();
-        ctx.fillStyle = cor.fundo;
-        ctx.fill();
-        ctx.strokeStyle = '#D4AF37';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        // Ícone
-        const iconAngle = start + arc / 2;
-        const iconR = segR * 0.72;
-        ctx.save();
-        ctx.translate(cx + iconR * Math.cos(iconAngle), cy + iconR * Math.sin(iconAngle));
-        ctx.rotate(iconAngle + Math.PI / 2);
-        ctx.font = '13px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(ROLETA_ICONES[i % ROLETA_ICONES.length], 0, 0);
-        ctx.restore();
-
-        // Texto
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(start + arc / 2);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = cor.texto;
-        ctx.shadowColor = 'rgba(0,0,0,0.25)';
-        ctx.shadowBlur = 2;
-        const palavras = premio.split(' ');
-        let linhas = [], atual = '';
-        palavras.forEach(function(p) {
-          if ((atual + p).length > 11) { if (atual) linhas.push(atual.trim()); atual = p + ' '; }
-          else atual += p + ' ';
-        });
-        if (atual.trim()) linhas.push(atual.trim());
-        linhas = linhas.slice(0, 3);
-        const lh = 11;
-        const base = segR - 30;
-        ctx.font = "bold 8.5px 'DM Sans', sans-serif";
-        linhas.forEach(function(l, li) {
-          ctx.fillText(l, base, (li - (linhas.length - 1) / 2) * lh);
-        });
-        ctx.shadowBlur = 0;
-        ctx.restore();
-      });
-
-      // Bolinhas LED
-      const ledCount = 28;
-      const ledR = cx - 13;
-      for (let i = 0; i < ledCount; i++) {
-        const a = (2 * Math.PI / ledCount) * i;
-        const lx = cx + ledR * Math.cos(a);
-        const ly = cy + ledR * Math.sin(a);
-        ctx.beginPath();
-        ctx.arc(lx, ly, 4.5, 0, 2 * Math.PI);
-        ctx.fillStyle = i % 2 === 0 ? '#FFF8DC' : '#FFD700';
-        if (i % 2 === 0) { ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 8; }
-        ctx.fill();
-        ctx.shadowBlur = 0;
+      function segPath(i) {
+        const s = SEG * i - 90, e = s + SEG;
+        const [x1,y1] = pt(s, R), [x2,y2] = pt(e, R);
+        return `M${CX},${CY} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 0,1 ${x2.toFixed(2)},${y2.toFixed(2)} Z`;
       }
 
-      // Centro dourado
-      const centerGrad = ctx.createRadialGradient(cx - 6, cy - 6, 4, cx, cy, 28);
-      centerGrad.addColorStop(0, '#FFE066');
-      centerGrad.addColorStop(0.5, '#D4AF37');
-      centerGrad.addColorStop(1, '#8B6914');
-      ctx.beginPath();
-      ctx.arc(cx, cy, 28, 0, 2 * Math.PI);
-      ctx.fillStyle = centerGrad;
-      ctx.fill();
-      ctx.strokeStyle = '#FFF';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
+      function wrapWords(text, maxChars) {
+        const words = text.split(' ');
+        const lines = []; let cur = '';
+        words.forEach(w => {
+          if ((cur+' '+w).trim().length > maxChars) { if(cur) lines.push(cur.trim()); cur = w; }
+          else cur = (cur+' '+w).trim();
+        });
+        if (cur) lines.push(cur.trim());
+        return lines.slice(0,3);
+      }
 
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#FFF';
-      ctx.font = "bold 10px 'DM Sans', sans-serif";
-      ctx.shadowColor = 'rgba(0,0,0,0.4)';
-      ctx.shadowBlur = 3;
-      ctx.fillText('GIRAR', cx, cy - 5);
-      ctx.font = '9px serif';
-      ctx.fillText('★ ★ ★', cx, cy + 7);
-      ctx.shadowBlur = 0;
-    }
+      // Segments
+      const segs = premios.map((p,i) => {
+        const c = CORES[i%2];
+        return `<path d="${segPath(i)}" fill="${c.bg}" stroke="#D4AF37" stroke-width="2.5"/>`;
+      }).join('');
 
-    // Animação idle: pisca os LEDs alternados
-    let _ledFrame = 0;
-    let _ledTimer = null;
-    function iniciarAnimacaoLED() {
-      if (_ledTimer) return;
-      _ledTimer = setInterval(function() {
-        _ledFrame++;
-        const canvas = document.getElementById('roletaCanvas');
-        if (!canvas || !canvas.getContext) return;
-        const ctx = canvas.getContext('2d');
-        const cx = canvas.width / 2, cy = canvas.height / 2;
-        const ledCount = 28, ledR = cx - 13;
-        for (let i = 0; i < ledCount; i++) {
-          const a = (2 * Math.PI / ledCount) * i;
-          const lx = cx + ledR * Math.cos(a);
-          const ly = cy + ledR * Math.sin(a);
-          ctx.beginPath();
-          ctx.arc(lx, ly, 4.5, 0, 2 * Math.PI);
-          const aceso = (i + _ledFrame) % 2 === 0;
-          ctx.fillStyle = aceso ? '#FFF8DC' : '#FFD700';
-          ctx.shadowColor = aceso ? '#FFD700' : 'transparent';
-          ctx.shadowBlur = aceso ? 10 : 0;
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        }
-      }, 500);
-    }
-    function pararAnimacaoLED() {
-      if (_ledTimer) { clearInterval(_ledTimer); _ledTimer = null; }
+      // Gold spoke lines
+      const spokes = premios.map((_,i) => {
+        const d = SEG * i - 90;
+        const [x,y] = pt(d, R);
+        return `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(2)}" y2="${y.toFixed(2)}" stroke="#D4AF37" stroke-width="2"/>`;
+      }).join('');
+
+      // Text + emoji
+      const texts = premios.map((p,i) => {
+        const mid = SEG * i - 90 + SEG/2;
+        const [tx,ty] = pt(mid, R*0.58);
+        const c = CORES[i%2];
+        const lines = wrapWords(p.replace(/^[^\s]+\s/,''), 13);
+        const totalH = lines.length * 13;
+        const emojiY = -totalH/2 - 10;
+        return `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)}) rotate(${(mid+90).toFixed(1)})">
+      <text x="0" y="${emojiY.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="15" font-family="serif">${EMOJIS[i]}</text>
+      ${lines.map((l,li) => `<text x="0" y="${((li-(lines.length-1)/2)*13+3).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" fill="${c.txt}" font-family="'DM Sans',Arial,sans-serif" font-weight="700" font-size="9.5">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text>`).join('')}
+    </g>`;
+      }).join('');
+
+      // LED lights
+      const LED_N = 30;
+      const leds = Array.from({length:LED_N},(_,i)=>{
+        const [lx,ly] = pt((360/LED_N)*i-90, R_LED);
+        return `<circle cx="${lx.toFixed(2)}" cy="${ly.toFixed(2)}" r="5.5" class="r-led r-led-${i%2}"/>`;
+      }).join('');
+
+      const svg = `<svg id="roletaCanvas" viewBox="0 0 400 400" width="330" height="330"
+    xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible;filter:drop-shadow(0 8px 24px rgba(0,0,0,.45))">
+  <defs>
+    <radialGradient id="rg-ring" cx="50%" cy="50%" r="50%">
+      <stop offset="70%" stop-color="#D42B73"/>
+      <stop offset="100%" stop-color="#6A082E"/>
+    </radialGradient>
+    <radialGradient id="rg-ctr" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FFE57A"/>
+      <stop offset="48%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#7A5800"/>
+    </radialGradient>
+    <filter id="f-glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Outer ring -->
+  <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="url(#rg-ring)"/>
+  <circle cx="${CX}" cy="${CY}" r="${R_OUTER}" fill="none" stroke="#D4AF37" stroke-width="3.5"/>
+  <!-- WHEEL (rotates) -->
+  <g id="roletaRoda">
+    ${segs}${spokes}${texts}
+  </g>
+  <!-- Inner gold border (static) -->
+  <circle cx="${CX}" cy="${CY}" r="${R+1}" fill="none" stroke="#D4AF37" stroke-width="3"/>
+  <!-- LEDs (static) -->
+  ${leds}
+  <!-- Center -->
+  <circle cx="${CX}" cy="${CY}" r="42" fill="url(#rg-ctr)" stroke="#FFF" stroke-width="3.5" filter="url(#f-glow)"/>
+  <circle cx="${CX}" cy="${CY}" r="38" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="1.5"/>
+  <text x="${CX}" y="${CY-6}" text-anchor="middle" dominant-baseline="middle" fill="#FFF" font-family="'DM Sans',Arial,sans-serif" font-weight="800" font-size="12.5" letter-spacing="1.5">GIRAR</text>
+  <text x="${CX}" y="${CY+10}" text-anchor="middle" dominant-baseline="middle" fill="rgba(255,255,255,.85)" font-family="serif" font-size="11">★ ★ ★</text>
+</svg>`;
+
+      const div = document.createElement('div');
+      div.innerHTML = svg;
+      wrap.insertBefore(div.firstElementChild, wrap.firstChild);
     }
 
     async function girarRoleta() {
       if (_roletaGirandoFlag) return;
-      const canvas = document.getElementById('roletaCanvas');
       const btn = document.getElementById('roletaGirarBtn');
-      if (!canvas || !btn) return;
-      canvas.style.transformOrigin = 'center center';
+      if (!btn) return;
 
       // Verificar limite de vencedores (conta teste tem giros infinitos)
       if (!isContaTeste()) {
@@ -1339,8 +1295,12 @@ Pedido pelo cardápio online ✨`;
       const rotacaoFinal = _roletaRotacaoAtual + anguloAlvo;
 
       // Animar com CSS transform
-      canvas.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 1)';
-      canvas.style.transform = 'rotate(' + rotacaoFinal + 'deg)';
+      const roda = document.getElementById('roletaRoda');
+      if (roda) {
+        roda.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 1)';
+        roda.style.transformOrigin = '200px 200px';
+        roda.style.transform = 'rotate(' + rotacaoFinal + 'deg)';
+      }
       _roletaRotacaoAtual = rotacaoFinal % 360;
 
       // Aguardar animação
