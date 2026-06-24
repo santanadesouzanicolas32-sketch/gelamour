@@ -1208,6 +1208,7 @@ Pedido pelo cardápio online ✨`;
       await salvarVencedor(premio);
 
       _roletaGirandoFlag = false;
+      if (isContaTeste()) { btn.disabled = false; btn.textContent = "🎡 GIRAR AGORA!"; }
     }
 
     async function salvarVencedor(premio) {
