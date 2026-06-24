@@ -23,6 +23,13 @@ npm-debug.log*
 .idea/
 *.swp
 
+# Claude Code
+.claude/
+
+# Legacy (deletado — não recriar)
+backend/
+iniciar-servidor.bat
+
 # OS
 .DS_Store
 Thumbs.db
