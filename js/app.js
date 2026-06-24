@@ -1138,8 +1138,157 @@ Pedido pelo cardápio online ✨`;
       }
     }
 
-    // Roda agora é imagem estática — função mantida por compatibilidade
-    function desenharRoleta() { /* imagem: images/roleta.webp */ }
+    // ── Roleta Canvas Profissional ──────────────────────────────────────
+    const ROLETA_CORES = [
+      { fundo: '#FAF0F2', texto: '#C23A6E' },
+      { fundo: '#E8528A', texto: '#FFFFFF' },
+    ];
+    const ROLETA_ICONES = ['💸','🍫','💰','📱','🛍️','😊'];
+
+    function desenharRoleta(premios) {
+      const canvas = document.getElementById('roletaCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width, H = canvas.height;
+      const cx = W / 2, cy = H / 2;
+      const n = premios.length;
+      const arc = (2 * Math.PI) / n;
+      ctx.clearRect(0, 0, W, H);
+
+      // Anel externo
+      const outerGrad = ctx.createRadialGradient(cx, cy, cx * 0.72, cx, cy, cx - 1);
+      outerGrad.addColorStop(0, '#E8528A');
+      outerGrad.addColorStop(1, '#9C1C4A');
+      ctx.beginPath();
+      ctx.arc(cx, cy, cx - 1, 0, 2 * Math.PI);
+      ctx.fillStyle = outerGrad;
+      ctx.fill();
+
+      // Segmentos
+      const segR = cx - 26;
+      premios.forEach(function(premio, i) {
+        const start = arc * i - Math.PI / 2;
+        const end = start + arc;
+        const cor = ROLETA_CORES[i % 2];
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, segR, start, end);
+        ctx.closePath();
+        ctx.fillStyle = cor.fundo;
+        ctx.fill();
+        ctx.strokeStyle = '#D4AF37';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Ícone
+        const iconAngle = start + arc / 2;
+        const iconR = segR * 0.72;
+        ctx.save();
+        ctx.translate(cx + iconR * Math.cos(iconAngle), cy + iconR * Math.sin(iconAngle));
+        ctx.rotate(iconAngle + Math.PI / 2);
+        ctx.font = '13px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(ROLETA_ICONES[i % ROLETA_ICONES.length], 0, 0);
+        ctx.restore();
+
+        // Texto
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(start + arc / 2);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = cor.texto;
+        ctx.shadowColor = 'rgba(0,0,0,0.25)';
+        ctx.shadowBlur = 2;
+        const palavras = premio.split(' ');
+        let linhas = [], atual = '';
+        palavras.forEach(function(p) {
+          if ((atual + p).length > 11) { if (atual) linhas.push(atual.trim()); atual = p + ' '; }
+          else atual += p + ' ';
+        });
+        if (atual.trim()) linhas.push(atual.trim());
+        linhas = linhas.slice(0, 3);
+        const lh = 11;
+        const base = segR - 30;
+        ctx.font = "bold 8.5px 'DM Sans', sans-serif";
+        linhas.forEach(function(l, li) {
+          ctx.fillText(l, base, (li - (linhas.length - 1) / 2) * lh);
+        });
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      });
+
+      // Bolinhas LED
+      const ledCount = 28;
+      const ledR = cx - 13;
+      for (let i = 0; i < ledCount; i++) {
+        const a = (2 * Math.PI / ledCount) * i;
+        const lx = cx + ledR * Math.cos(a);
+        const ly = cy + ledR * Math.sin(a);
+        ctx.beginPath();
+        ctx.arc(lx, ly, 4.5, 0, 2 * Math.PI);
+        ctx.fillStyle = i % 2 === 0 ? '#FFF8DC' : '#FFD700';
+        if (i % 2 === 0) { ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 8; }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Centro dourado
+      const centerGrad = ctx.createRadialGradient(cx - 6, cy - 6, 4, cx, cy, 28);
+      centerGrad.addColorStop(0, '#FFE066');
+      centerGrad.addColorStop(0.5, '#D4AF37');
+      centerGrad.addColorStop(1, '#8B6914');
+      ctx.beginPath();
+      ctx.arc(cx, cy, 28, 0, 2 * Math.PI);
+      ctx.fillStyle = centerGrad;
+      ctx.fill();
+      ctx.strokeStyle = '#FFF';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FFF';
+      ctx.font = "bold 10px 'DM Sans', sans-serif";
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 3;
+      ctx.fillText('GIRAR', cx, cy - 5);
+      ctx.font = '9px serif';
+      ctx.fillText('★ ★ ★', cx, cy + 7);
+      ctx.shadowBlur = 0;
+    }
+
+    // Animação idle: pisca os LEDs alternados
+    let _ledFrame = 0;
+    let _ledTimer = null;
+    function iniciarAnimacaoLED() {
+      if (_ledTimer) return;
+      _ledTimer = setInterval(function() {
+        _ledFrame++;
+        const canvas = document.getElementById('roletaCanvas');
+        if (!canvas || !canvas.getContext) return;
+        const ctx = canvas.getContext('2d');
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+        const ledCount = 28, ledR = cx - 13;
+        for (let i = 0; i < ledCount; i++) {
+          const a = (2 * Math.PI / ledCount) * i;
+          const lx = cx + ledR * Math.cos(a);
+          const ly = cy + ledR * Math.sin(a);
+          ctx.beginPath();
+          ctx.arc(lx, ly, 4.5, 0, 2 * Math.PI);
+          const aceso = (i + _ledFrame) % 2 === 0;
+          ctx.fillStyle = aceso ? '#FFF8DC' : '#FFD700';
+          ctx.shadowColor = aceso ? '#FFD700' : 'transparent';
+          ctx.shadowBlur = aceso ? 10 : 0;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }, 500);
+    }
+    function pararAnimacaoLED() {
+      if (_ledTimer) { clearInterval(_ledTimer); _ledTimer = null; }
+    }
 
     async function girarRoleta() {
       if (_roletaGirandoFlag) return;
