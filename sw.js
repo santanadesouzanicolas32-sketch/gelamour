@@ -6,8 +6,7 @@ var ASSETS = [
   '/gelamour/js/app.js',
   '/gelamour/icon-192.png',
   '/gelamour/icon-512.png',
-  '/gelamour/images/logo.webp',
-  '/gelamour/images/roleta.webp'
+  '/gelamour/images/logo.webp'
 ];
 
 self.addEventListener('install', function(e) {

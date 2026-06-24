@@ -298,9 +298,12 @@ Pedido pelo cardápio online ✨`;
       const id = window._pedidoIdPendente;
       const btn = document.querySelector('.waConfirm-sim');
       if (!id) { fecharConfirmWA(); return; }
+      // Verificar que o pedido pertence ao usuário logado antes de confirmar
+      if (!clienteAtual) { fecharConfirmWA(); return; }
       if (btn) { btn.textContent = 'Confirmando...'; btn.disabled = true; }
       try {
-        const r = await fetch(SUPABASE_URL + '/rest/v1/pedidos?id=eq.' + id, {
+        // Filtro duplo: id + cliente_id para evitar IDOR
+        const r = await fetch(SUPABASE_URL + '/rest/v1/pedidos?id=eq.' + id + '&cliente_id=eq.' + clienteAtual.id, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -1065,14 +1068,6 @@ Pedido pelo cardápio online ✨`;
         return;
       }
 
-      // Roleta em desenvolvimento: botão visível mas bloqueado no clique
-      if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = "1"; girarBtn.textContent = "🎡 GIRAR AGORA!"; }
-      statusBox.innerHTML = "";
-      instrucoes.style.display = "none";
-      btnEnviar.style.display = "none";
-      jaGirou.style.display = "none";
-      return;
-
       if (!info) {
         statusBox.innerHTML = '';
         instrucoes.style.display = 'block';
@@ -1300,34 +1295,41 @@ Pedido pelo cardápio online ✨`;
       const btn = document.getElementById('roletaGirarBtn');
       if (!btn) return;
 
-      // Roleta em desenvolvimento — só conta teste pode girar
-      if (!isContaTeste()) {
-        mostrarToast('🚧 Roleta em breve! Estamos finalizando os últimos detalhes para você. 🎡', 'info');
+      // Verificar se usuário está logado
+      if (!clienteAtual) {
+        mostrarToast('Faça login para girar a roleta!', 'erro');
         return;
       }
-
-      // Verificar limite de vencedores (conta teste tem giros infinitos)
-      if (!isContaTeste()) {
-      try {
-        const semana = getSemanaAtual();
-        const resp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_vencedores?semana=eq.${semana}&select=id`, {
-          headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-        });
-        const vencedores = await resp.json();
-        // Buscar limite configurado
-        const cfgResp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_config?id=eq.1&select=max_vencedores_semana`, {
-          headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-        });
-        const cfg = await cfgResp.json();
-        const limite = cfg[0]?.max_vencedores_semana ?? 1;
-        if (vencedores.length >= limite) {
-          btn.disabled = true;
-          btn.style.opacity = '0.4';
-          document.getElementById('roletaResultado').innerHTML = '⚠️ <strong>Já temos um ganhador esta semana!</strong><br><small>A próxima rodada começa na semana que vem. Fique de olho!</small>';
-          document.getElementById('roletaResultado').classList.add('visivel');
+      // Verificar status de participação antes de girar
+      const statusGiro = await verificarStatusRoleta();
+      if (!statusGiro || statusGiro.status !== 'aprovado' || statusGiro.ja_girou) {
+        if (!isContaTeste()) {
+          mostrarToast('Você precisa ser aprovado pela equipe antes de girar!', 'erro');
           return;
         }
-      } catch(e) { console.warn('Erro ao verificar limite semanal:', e); } }
+      }
+      // Verificar limite de vencedores semanais
+      if (!isContaTeste()) {
+        try {
+          const semana = getSemanaAtual();
+          const resp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_vencedores?semana=eq.${semana}&select=id`, {
+            headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
+          });
+          const vencedores = await resp.json();
+          const cfgResp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_config?id=eq.1&select=max_vencedores_semana`, {
+            headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
+          });
+          const cfg = await cfgResp.json();
+          const limite = cfg[0]?.max_vencedores_semana ?? 1;
+          if (vencedores.length >= limite) {
+            btn.disabled = true;
+            btn.style.opacity = '0.4';
+            document.getElementById('roletaResultado').innerHTML = '⚠️ <strong>Já temos um ganhador esta semana!</strong><br><small>A próxima rodada começa na semana que vem. Fique de olho!</small>';
+            document.getElementById('roletaResultado').classList.add('visivel');
+            return;
+          }
+        } catch(e) { console.warn('Erro ao verificar limite semanal:', e); }
+      }
 
       _roletaGirandoFlag = true;
       btn.disabled = true;
