@@ -1024,6 +1024,16 @@ Pedido pelo cardápio online ✨`;
 
       const girarBtn = document.getElementById('roletaGirarBtn');
 
+      // Conta teste: giro livre sem aprovação
+      if (isContaTeste()) {
+        if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = "1"; girarBtn.textContent = "🎡 GIRAR AGORA!"; }
+        statusBox.innerHTML = "";
+        instrucoes.style.display = "none";
+        btnEnviar.style.display = "none";
+        jaGirou.style.display = "none";
+        return;
+      }
+
       if (!info) {
         statusBox.innerHTML = '';
         instrucoes.style.display = 'block';
