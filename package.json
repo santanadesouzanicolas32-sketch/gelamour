@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "description": "Cardápio online Gelamour",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc --watch"
+    "build": "node build.js",
+    "build:watch": "node build.js --watch",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "esbuild": "^0.21.0",
+    "@types/node": "^20.0.0"
   }
 }

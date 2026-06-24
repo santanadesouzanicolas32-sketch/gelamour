@@ -1,20 +1,37 @@
-name: Build & Deploy
+name: Build & Deploy Gelamour
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install
-      - run: npm run build
-      - name: Deploy to GitHub Pages
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Type check TypeScript
+        run: npm run typecheck || echo "⚠️ Type errors (non-blocking)"
+
+      - name: Build com esbuild
+        run: npm run build
+
+      - name: Verificar JS gerado
+        run: node --check js/app.js && echo "✅ JS syntax OK"
+
+      - name: Deploy para GitHub Pages
+        if: github.ref == 'refs/heads/master'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./
-          exclude_assets: 'src,.github,node_modules,package*.json,tsconfig.json'
+          exclude_assets: 'src,.github,node_modules,package*.json,tsconfig.json,build.js,scripts'

@@ -1,19 +1,19 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "module": "None",
-    "lib": ["ES2017", "DOM"],
-    "outDir": "js",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2017", "DOM", "DOM.Iterable"],
     "rootDir": "src",
-    "strict": false,
-    "noImplicitAny": false,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "skipLibCheck": true,
-    "removeComments": false,
     "declaration": false,
-    "sourceMap": false,
-    "allowJs": false,
-    "noEmitOnError": true
+    "sourceMap": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "build.js"]
 }

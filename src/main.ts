@@ -1,0 +1,1209 @@
+// src/main.ts — ponto de entrada Gelamour
+import { mostrarToast } from './utils/toast';
+import { escHTML } from './utils/security';
+import { formatarMoeda, getSemanaAtual, aplicarMascaraTelefone } from './utils/format';
+import { normalizarNome, normalizarTelefone } from './utils/security';
+import {
+  dbGet, dbPost, dbPatch, dbFetch, SUPABASE_URL, SUPABASE_ANON
+} from './services/supabase';
+import {
+  getClienteAtual, salvarSessao, limparSessao,
+  isContaTeste, isAdmin,
+  verificarTelefoneDB, cadastrarCliente, salvarEnderecoClienteDB
+} from './services/auth';
+import {
+  getCarrinho, getItens, getTotal,
+  adicionarItem, removerItem, limpar as limparCarrinhoStore,
+  isBoloForma, renderizarLista
+} from './modules/cart';
+import {
+  getPremios, getPremiosPadrao, setPremios,
+  getParticipacaoId, setParticipacaoId,
+  carregarConfig as carregarConfigRoleta,
+  verificarStatus as verificarStatusRoleta,
+  girar as girarRoletaFn,
+  salvarVencedor,
+  desenharRoleta
+} from './modules/roleta';
+import type { Cliente, Participacao } from './types';
+
+// ===== CONSTANTES =====
+const WA_NUMBER = atob('NTUxMTk0MDc3Mjc1MA==');
+const EDGE_URL = `${SUPABASE_URL}/functions/v1`;
+const DB_TIMEOUT = 10_000;
+
+// ===== ESTADO GLOBAL =====
+let clienteAtual: Cliente | null = null;
+let pagamentoSelecionado = '';
+
+// Estado Pix/Cartão
+let _pixPayload = '';
+let _pixPollTimer: ReturnType<typeof setInterval> | null = null;
+let _pixPedidoId: number | null = null;
+let _pixMsgWA = '';
+let _pixTotal = 0;
+let _pixNome = '';
+let _pixItens: Array<{ nome: string; preco: number }> = [];
+let _pixEndereco = '';
+let _cardTipo = 'credito';
+
+// Estado login UI
+let _verificando = false;
+let _cadastrando = false;
+
+// ===== FILTROS =====
+function filtrar(cat: string, btn: HTMLElement): void {
+  document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.prod-card').forEach(card => {
+    const el = card as HTMLElement;
+    if (cat === 'todos' || (el.dataset['cat'] === cat))
+      el.classList.remove('hidden');
+    else
+      el.classList.add('hidden');
+  });
+}
+
+// ===== CARRINHO =====
+function atualizarFab(): void {
+  const fab = document.getElementById('cartFab');
+  const badge = document.getElementById('cartBadge');
+  const itens = getItens();
+  if (badge) badge.textContent = String(itens.length);
+  if (fab) {
+    if (itens.length > 0) fab.classList.add('ativo');
+    else { fab.classList.remove('ativo'); fecharModal(); }
+  }
+}
+
+function pedirProduto(botao: HTMLElement, nome: string, preco: number): void {
+  const card = botao.closest('.prod-card') as HTMLElement | null;
+  const carrinho = getCarrinho();
+  if (carrinho[nome]) {
+    removerItem(nome);
+    card?.classList.remove('selecionado');
+    atualizarFab();
+    return;
+  }
+  adicionarItem(nome, preco);
+  card?.classList.add('selecionado');
+  atualizarFab();
+  abrirDialog(nome, preco);
+}
+
+function abrirDialog(nome: string, preco: number): void {
+  const el = document.getElementById('dialogProduto');
+  if (el) el.innerHTML = '<strong>' + escHTML(nome) + '</strong> — R$ ' + Number(preco).toFixed(2).replace('.', ',');
+  document.getElementById('dialogBackdrop')?.classList.add('aberto');
+}
+
+function fecharDialog(): void {
+  document.getElementById('dialogBackdrop')?.classList.remove('aberto');
+}
+
+function fecharDialogBackdrop(e: Event): void {
+  if ((e.target as HTMLElement).id === 'dialogBackdrop') fecharDialog();
+}
+
+function irParaFinalizar(): void {
+  fecharDialog();
+  abrirModal();
+}
+
+function renderizarCarrinho(): void {
+  renderizarLista('listaCarrinho', 'totalRodape', 'badgeCount');
+}
+
+function renderizarNoticeEncomenda(): void {
+  const el = document.getElementById('noticeEncomenda');
+  if (!el) return;
+  const itens = getItens();
+  const temForma = itens.some(i => isBoloForma(i.nome));
+  const temOutros = itens.some(i => !isBoloForma(i.nome));
+  if (temForma && temOutros) {
+    el.innerHTML = '<div class="notice-misto"><span>⚠️</span><span><strong>Atenção:</strong> Você misturou Bolos na Forma (feitos sob encomenda) com outros produtos. Considere pedidos separados para garantir o prazo!</span></div>';
+  } else if (temForma) {
+    el.innerHTML = '<div class="notice-encomenda"><span class="notice-encomenda-icon">⏰</span><span><strong>Bolo na Forma — Sob encomenda!</strong><br>Esses bolos são preparados especialmente para você. Prazo de <strong>5 horas a 1 dia útil</strong> após confirmação.</span></div>';
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+function abrirModal(): void {
+  renderizarCarrinho();
+  renderizarNoticeEncomenda();
+  document.getElementById('modalBackdrop')?.classList.add('aberto');
+  document.body.classList.add('modal-aberto');
+}
+
+function fecharModal(): void {
+  document.getElementById('modalBackdrop')?.classList.remove('aberto');
+  document.body.classList.remove('modal-aberto');
+}
+
+function fecharModalBackdrop(e: Event): void {
+  if ((e.target as HTMLElement).id === 'modalBackdrop') fecharModal();
+}
+
+function removerDoCarrinho(nome: string): void {
+  if (!getCarrinho()[nome]) return;
+  removerItem(nome);
+  document.querySelectorAll('.prod-card.selecionado').forEach(card => {
+    const nomeEl = card.querySelector('.prod-nome');
+    if (nomeEl && nomeEl.textContent?.trim() === nome) card.classList.remove('selecionado');
+  });
+  renderizarCarrinho();
+  atualizarFab();
+}
+
+function selecionarPagamento(el: HTMLElement): void {
+  document.querySelectorAll('.pagamento-opt').forEach(o => o.classList.remove('ativo'));
+  el.classList.add('ativo');
+  pagamentoSelecionado = (el as HTMLElement & { dataset: DOMStringMap }).dataset['pag'] ?? '';
+}
+
+function limparCarrinho(): void {
+  limparCarrinhoStore();
+  pagamentoSelecionado = '';
+  document.querySelectorAll('.pagamento-opt.ativo').forEach(o => o.classList.remove('ativo'));
+  const obsEl = document.getElementById('inpObs') as HTMLTextAreaElement | null;
+  if (obsEl) obsEl.value = '';
+  document.querySelectorAll('.prod-card.selecionado').forEach(c => c.classList.remove('selecionado'));
+  atualizarFab();
+  fecharModal();
+}
+
+// ===== BOLO NA FORMA =====
+function pedirBoloForma(botao: HTMLElement, nome: string, preco: number): void {
+  const card = botao.closest('.prod-card') as HTMLElement | null;
+  const carrinho = getCarrinho();
+  if (carrinho[nome]) {
+    removerItem(nome);
+    card?.classList.remove('selecionado');
+    atualizarFab();
+    renderizarNoticeEncomenda();
+    return;
+  }
+  adicionarItem(nome, preco);
+  card?.classList.add('selecionado');
+  atualizarFab();
+  abrirDialogBolo();
+}
+
+function abrirDialogBolo(): void {
+  document.getElementById('dialogBoloBackdrop')?.classList.add('aberto');
+}
+
+function fecharDialogBolo(e?: Event): void {
+  if (!e || (e.target as HTMLElement).id === 'dialogBoloBackdrop') {
+    document.getElementById('dialogBoloBackdrop')?.classList.remove('aberto');
+  }
+}
+
+function agendarBoloWhatsApp(): void {
+  const itensForma = getItens().filter(i => isBoloForma(i.nome));
+  let linhas = '';
+  let total = 0;
+  itensForma.forEach(i => {
+    linhas += '• ' + i.nome + ' — R$ ' + i.preco.toFixed(2).replace('.', ',') + '\n';
+    total = Math.round((total + i.preco) * 100) / 100;
+  });
+  const msg = '*🎂 AGENDAMENTO - BOLO NA FORMA - GELAMOUR*\n\nOlá! Gostaria de agendar o(s) seguinte(s) bolo(s):\n\n' + linhas + '\n*💰 Total:* R$ ' + total.toFixed(2).replace('.', ',') + '\n\n⏰ Sei que o prazo é de 5 horas a 1 dia útil. Por favor me informe a data e horário disponíveis para entrega. 😊';
+  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
+  fecharDialogBolo();
+}
+
+// ===== CAROUSEL =====
+function carouselNext(id: string, e: Event): void {
+  if (e) e.stopPropagation();
+  const c = document.getElementById(id);
+  if (!c) return;
+  const imgs = c.querySelectorAll('.carousel-img');
+  const dots = c.querySelectorAll('.carousel-dot');
+  let cur = 0;
+  imgs.forEach((img, i) => { if (img.classList.contains('ativo')) cur = i; });
+  imgs[cur]?.classList.remove('ativo');
+  dots[cur]?.classList.remove('ativo');
+  const next = (cur + 1) % imgs.length;
+  imgs[next]?.classList.add('ativo');
+  dots[next]?.classList.add('ativo');
+}
+
+function carouselPrev(id: string, e: Event): void {
+  if (e) e.stopPropagation();
+  const c = document.getElementById(id);
+  if (!c) return;
+  const imgs = c.querySelectorAll('.carousel-img');
+  const dots = c.querySelectorAll('.carousel-dot');
+  let cur = 0;
+  imgs.forEach((img, i) => { if (img.classList.contains('ativo')) cur = i; });
+  imgs[cur]?.classList.remove('ativo');
+  dots[cur]?.classList.remove('ativo');
+  const prev = (cur - 1 + imgs.length) % imgs.length;
+  imgs[prev]?.classList.add('ativo');
+  dots[prev]?.classList.add('ativo');
+}
+
+// ===== CHECKOUT / PEDIDO =====
+async function finalizarPedido(): Promise<void> {
+  const itens = getItens();
+  const temFormaFin = itens.some(i => isBoloForma(i.nome));
+  const temOutrosFin = itens.some(i => !isBoloForma(i.nome));
+  if (temFormaFin && temOutrosFin) {
+    if (!confirm('⚠️ Atenção!\n\nVocê tem Bolos na Forma (feitos sob encomenda) misturados com outros produtos no carrinho.\n\nBolos na Forma precisam de prazo de 5h a 1 dia útil para preparo.\n\nDeseja prosseguir com todos os itens mesmo assim?'))
+      return;
+  }
+  if (itens.length === 0) { alert('Adicione pelo menos um produto ao carrinho!'); return; }
+
+  const nome = (document.getElementById('inpNome') as HTMLInputElement)?.value.trim() ?? '';
+  const endereco = (document.getElementById('inpEndereco') as HTMLTextAreaElement)?.value.trim() ?? '';
+  const obs = (document.getElementById('inpObs') as HTMLTextAreaElement)?.value.trim() ?? '';
+
+  if (!nome) { alert('Por favor, informe seu nome completo.'); document.getElementById('inpNome')?.focus(); return; }
+  if (!endereco) { alert('Por favor, informe seu endereço.'); document.getElementById('inpEndereco')?.focus(); return; }
+  if (!pagamentoSelecionado) { alert('Por favor, escolha a forma de pagamento.'); return; }
+
+  // Re-verificar preços dos botões para evitar manipulação client-side
+  const carrinho = getCarrinho();
+  document.querySelectorAll('.btn-pedir').forEach(btn => {
+    const onclickAttr = btn.getAttribute('onclick') ?? '';
+    const m = onclickAttr.match(/pedirProduto\(this,'(.+?)',(\d+(?:\.\d+)?)\)/);
+    if (!m) return;
+    if (carrinho[m[1]!]) carrinho[m[1]!]!.preco = parseFloat(m[2]!);
+  });
+
+  const itensVerificados = getItens();
+  let total = 0;
+  let linhasItens = '';
+  itensVerificados.forEach(item => {
+    total = Math.round((total + item.preco) * 100) / 100;
+    linhasItens += `• ${item.nome} — R$ ${item.preco.toFixed(2).replace('.', ',')}\n`;
+  });
+
+  const msg = `*🍰 NOVO PEDIDO - GELAMOUR*\n\n*📋 ITENS:*\n${linhasItens}\n*💰 Total:* R$ ${total.toFixed(2).replace('.', ',')}\n\n*👤 Nome:* ${nome}\n*📍 Endereço:* ${endereco}\n*💳 Pagamento:* ${pagamentoSelecionado}${obs ? `\n*📝 Obs:* ${obs}` : ''}\n\nPedido pelo cardápio online ✨`;
+
+  const btnFin = document.getElementById('btnFinalizar') as HTMLButtonElement | null;
+  const txtOrig = btnFin ? (btnFin.textContent ?? '') : '';
+  if (btnFin) { btnFin.disabled = true; btnFin.textContent = 'Salvando pedido...'; }
+
+  let _pedidoId: number | null = null;
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), DB_TIMEOUT);
+    const r = await fetch(SUPABASE_URL + '/rest/v1/pedidos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON,
+        'Authorization': 'Bearer ' + SUPABASE_ANON,
+        'Prefer': 'return=headers-only'
+      },
+      body: JSON.stringify({
+        nome, endereco,
+        pagamento: pagamentoSelecionado,
+        itens: itensVerificados.map(i => ({ nome: i.nome, preco: i.preco })),
+        total,
+        status: 'aguardando',
+        observacao: obs || null,
+        cliente_id: clienteAtual ? clienteAtual.id : null,
+        telefone: clienteAtual ? clienteAtual.telefone : null
+      }),
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+    if (!r.ok) {
+      const errTxt = await r.text().catch(() => '');
+      console.error('Supabase INSERT pedido falhou:', r.status, errTxt);
+      throw new Error('HTTP ' + r.status + ' — ' + errTxt.slice(0, 120));
+    }
+    const loc = r.headers.get('Location') ?? '';
+    const idMatch = loc.match(/id=eq\.(\d+)/);
+    if (idMatch) {
+      _pedidoId = parseInt(idMatch[1]!, 10);
+      if (btnFin) btnFin.textContent = '✅ Pedido registrado!';
+      if (clienteAtual) {
+        salvarEnderecoClienteDB(clienteAtual.id, endereco).then(() => {
+          if (clienteAtual) clienteAtual.endereco = endereco;
+        }).catch(e => console.warn('Não foi possível salvar endereço:', e));
+      }
+    }
+  } catch (e) {
+    if (btnFin) btnFin.textContent = '⚠️ Erro - pedido só no WhatsApp';
+    console.warn('Erro ao salvar no banco:', e);
+  }
+
+  setTimeout(() => {
+    if (btnFin) { btnFin.disabled = false; btnFin.textContent = txtOrig; }
+  }, 3000);
+
+  if ((pagamentoSelecionado === 'Pix' || pagamentoSelecionado === 'Cartão') && _pedidoId) {
+    const billingType = pagamentoSelecionado === 'Cartão' ? 'CREDIT_CARD' : 'PIX';
+    iniciarFluxoPix(_pedidoId, total, nome, msg, billingType, itensVerificados, endereco);
+  } else {
+    window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
+    if (_pedidoId) {
+      (window as unknown as Record<string, unknown>)['_pedidoIdPendente'] = _pedidoId;
+      document.getElementById('waConfirmBackdrop')?.classList.add('aberto');
+    }
+  }
+}
+
+async function confirmarEnvioWA(): Promise<void> {
+  const id = (window as unknown as Record<string, unknown>)['_pedidoIdPendente'] as number | null;
+  const btn = document.querySelector('.waConfirm-sim') as HTMLButtonElement | null;
+  if (!id) { fecharConfirmWA(); return; }
+  if (!clienteAtual) { fecharConfirmWA(); return; }
+  if (btn) { btn.textContent = 'Confirmando...'; btn.disabled = true; }
+  try {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/pedidos?id=eq.' + id + '&cliente_id=eq.' + clienteAtual.id, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON,
+        'Authorization': 'Bearer ' + SUPABASE_ANON,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ status: 'confirmado' })
+    });
+    if (!r.ok) throw new Error('status ' + r.status);
+    if (btn) btn.textContent = '🎉 Pedido confirmado!';
+    setTimeout(() => { fecharConfirmWA(); limparCarrinho(); }, 1800);
+  } catch (e) {
+    if (btn) { btn.textContent = '✅ Sim, mensagem enviada!'; btn.disabled = false; }
+    console.warn('Erro ao confirmar pedido:', e);
+    fecharConfirmWA();
+  }
+}
+
+function fecharConfirmWA(): void {
+  document.getElementById('waConfirmBackdrop')?.classList.remove('aberto');
+  (window as unknown as Record<string, unknown>)['_pedidoIdPendente'] = null;
+}
+
+// ===== FLUXO PIX =====
+async function iniciarFluxoPix(
+  pedidoId: number,
+  total: number,
+  nome: string,
+  msgWA: string,
+  billingType: string,
+  itens: Array<{ nome: string; preco: number }>,
+  endereco: string
+): Promise<void> {
+  _pixPedidoId = pedidoId;
+  _pixMsgWA = msgWA;
+  _pixTotal = total;
+  _pixNome = nome;
+  _pixItens = itens || [];
+  _pixEndereco = endereco || '';
+  const isPix = billingType !== 'CREDIT_CARD';
+
+  const pixTitulo = document.getElementById('pixTitulo');
+  const pixSub = document.getElementById('pixSub');
+  const pixValor = document.getElementById('pixValor');
+  const secaoPix = document.getElementById('secaoPix');
+  const secaoCartao = document.getElementById('secaoCartao');
+  const pixJaPagueiBtn = document.getElementById('pixJaPagueiBtn') as HTMLElement | null;
+  const pixStatus = document.getElementById('pixStatus');
+  const pixCodeBox = document.getElementById('pixCodeBox');
+  const pixQrImg = document.getElementById('pixQrImg') as HTMLImageElement | null;
+
+  if (pixTitulo) pixTitulo.textContent = isPix ? '💠 Pague via Pix' : '💳 Pague com Cartão';
+  if (pixSub) pixSub.textContent = isPix ? 'Copie o código ou escaneie o QR Code' : 'Crédito ou débito — preencha os dados abaixo';
+  if (pixValor) pixValor.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  if (secaoPix) secaoPix.style.display = isPix ? 'block' : 'none';
+  if (secaoCartao) secaoCartao.style.display = isPix ? 'none' : 'block';
+  if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'none';
+  if (pixStatus) { pixStatus.textContent = isPix ? '⏳ Gerando QR Code...' : ''; pixStatus.className = 'pix-status' + (isPix ? ' pix-aguardando' : ''); }
+  if (pixCodeBox) pixCodeBox.textContent = 'Gerando código...';
+  if (pixQrImg) pixQrImg.src = '';
+  document.getElementById('pixBackdrop')?.classList.add('aberto');
+  fecharModal();
+
+  if (!isPix) return;
+
+  try {
+    const resp = await fetch(EDGE_URL + '/criar-pix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
+      body: JSON.stringify({ pedido_id: pedidoId, total, nome, billing_type: 'PIX' }),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json() as { error?: string; qr_code?: string; qr_code_image?: string };
+    if (data.error) throw new Error(data.error);
+    _pixPayload = data.qr_code || '';
+    if (pixCodeBox) pixCodeBox.textContent = _pixPayload || 'Código indisponível';
+    if (data.qr_code_image && pixQrImg) pixQrImg.src = 'data:image/png;base64,' + data.qr_code_image;
+    if (pixStatus) { pixStatus.textContent = '⏳ Aguardando pagamento...'; pixStatus.className = 'pix-status pix-aguardando'; }
+    if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'none';
+    _pixPollTimer = setInterval(verificarPagamentoPix, 4000);
+  } catch (e) {
+    console.warn('Erro ao criar Pix:', e);
+    if (pixCodeBox) pixCodeBox.textContent = 'Erro ao gerar código.';
+    if (pixStatus) { pixStatus.textContent = '⚠️ Erro ao gerar QR Code. Tente outra forma de pagamento.'; pixStatus.className = 'pix-status'; }
+    if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
+  }
+}
+
+function selecionarTipoCartao(tipo: string): void {
+  _cardTipo = tipo;
+  document.getElementById('btnCredito')?.classList.toggle('ativo', tipo === 'credito');
+  document.getElementById('btnDebito')?.classList.toggle('ativo', tipo === 'debito');
+}
+
+function formatarCartao(el: HTMLInputElement): void {
+  let v = el.value.replace(/\D/g, '').substring(0, 16);
+  el.value = v.replace(/(.{4})(?=.)/g, '$1 ');
+}
+
+function formatarCpf(el: HTMLInputElement): void {
+  let v = el.value.replace(/\D/g, '').substring(0, 11);
+  v = v.replace(/(\d{3})(\d)/, '$1.$2');
+  v = v.replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
+  v = v.replace(/(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
+  el.value = v;
+}
+
+function formatarValidade(el: HTMLInputElement): void {
+  let v = el.value.replace(/\D/g, '').substring(0, 4);
+  if (v.length >= 3) v = v.substring(0, 2) + '/' + v.substring(2);
+  el.value = v;
+}
+
+function formatarCep(el: HTMLInputElement): void {
+  let v = el.value.replace(/\D/g, '').substring(0, 8);
+  if (v.length > 5) v = v.substring(0, 5) + '-' + v.substring(5);
+  el.value = v;
+}
+
+async function pagarCartao(): Promise<void> {
+  mostrarToast('💳 Pagamento por cartão em breve! Use o Pix por enquanto.', 'info');
+}
+
+async function verificarPagamentoPix(): Promise<void> {
+  if (!_pixPedidoId) return;
+  try {
+    const resp = await fetch(SUPABASE_URL + '/rest/v1/pedidos?id=eq.' + _pixPedidoId + '&select=status_pagamento', {
+      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
+    });
+    const rows = await resp.json() as Array<{ status_pagamento: string }>;
+    if (rows[0] && rows[0].status_pagamento === 'pago') {
+      if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
+      mostrarReciboPix();
+    }
+  } catch (e) { console.warn('Erro ao verificar pagamento:', e); }
+}
+
+function mostrarReciboPix(): void {
+  const linhasItens = _pixItens.map(i =>
+    '<div class="recibo-item"><span>' + escHTML(i.nome) + '</span><span>R$ ' + Number(i.preco).toFixed(2).replace('.', ',') + '</span></div>'
+  ).join('');
+  const pixBox = document.querySelector('.pix-box');
+  if (pixBox) {
+    pixBox.innerHTML =
+      '<div style="font-size:52px;margin-bottom:8px">✅</div>' +
+      '<div style="font-size:20px;font-weight:700;color:#166534;margin-bottom:4px">Pagamento recebido!</div>' +
+      '<div style="font-size:13px;color:#6B5B52;margin-bottom:16px">Seu pedido foi confirmado com sucesso</div>' +
+      '<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px;text-align:left;margin-bottom:14px">' +
+      '<div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📋 Resumo do pedido</div>' +
+      linhasItens +
+      '<div style="border-top:1px solid #bbf7d0;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:700;font-size:14px">' +
+      '<span>Total</span><span style="color:#E8528A">R$ ' + Number(_pixTotal).toFixed(2).replace('.', ',') + '</span>' +
+      '</div>' +
+      '<div style="margin-top:8px;font-size:11px;color:#4b7c5e">📍 ' + escHTML(_pixEndereco) + '</div>' +
+      '</div>' +
+      '<button onclick="fecharReciboPix()" style="width:100%;padding:13px;background:linear-gradient(135deg,#E8528A,#C23A6E);color:#fff;font-weight:700;font-size:15px;border:none;border-radius:12px;cursor:pointer;font-family:inherit">💬 Ver pedido no WhatsApp</button>';
+  }
+  setTimeout(() => {
+    window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(_pixMsgWA), '_blank');
+  }, 2000);
+}
+
+function fecharReciboPix(): void {
+  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(_pixMsgWA), '_blank');
+  document.getElementById('pixBackdrop')?.classList.remove('aberto');
+  limparCarrinho();
+  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0; _pixNome = '';
+  _pixItens = []; _pixEndereco = '';
+}
+
+function copiarPix(): void {
+  if (!_pixPayload) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(_pixPayload).then(() => {
+      const btn = document.querySelector('.pix-copy-btn') as HTMLButtonElement | null;
+      if (btn) { btn.textContent = '✅ Código copiado!'; setTimeout(() => { btn.textContent = '📋 Copiar chave Pix'; }, 2500); }
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = _pixPayload;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+}
+
+function cancelarPix(): void {
+  if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
+  const estaAberto = document.getElementById('pixBackdrop')?.classList.contains('aberto') ?? false;
+  document.getElementById('pixBackdrop')?.classList.remove('aberto');
+  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0; _pixNome = '';
+  _pixItens = []; _pixEndereco = '';
+  if (estaAberto) abrirModal();
+}
+
+function pixJaPaguei(): void {
+  cancelarPix();
+  finalizarPedidoWhatsApp();
+}
+
+function finalizarPedidoWhatsApp(): void {
+  const itens = getItens();
+  if (itens.length === 0) { mostrarToast('Carrinho vazio', 'erro'); return; }
+  const nome = (document.getElementById('inpNome') as HTMLInputElement)?.value.trim() ?? '';
+  const endereco = (document.getElementById('inpEndereco') as HTMLTextAreaElement)?.value.trim() ?? '';
+  const total = itens.reduce((s, i) => s + i.preco, 0);
+  const linhas = itens.map(i => `▸ ${i.nome} — R$ ${i.preco.toFixed(2).replace('.', ',')} `).join('\n');
+  const msg = `🛒 *PEDIDO GELAMOUR* (Pix enviado manualmente)\n\n${linhas}\n\n*Total: R$ ${total.toFixed(2).replace('.', ',')}*\n\n👤 ${nome}\n📍 ${endereco}\n\n_Confirmando envio do pagamento Pix._`;
+  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ===== LOGIN UI =====
+function mascaraTelefone(el: HTMLInputElement): void {
+  el.value = aplicarMascaraTelefone(el.value);
+}
+
+function entrarComCliente(cliente: Cliente): void {
+  clienteAtual = cliente;
+  salvarSessao(cliente);
+  document.getElementById('loginOverlay')!.style.display = 'none';
+  const usuarioBar = document.getElementById('usuarioBar');
+  if (usuarioBar) usuarioBar.style.display = 'inline-flex';
+  const usuarioNomeEl = document.getElementById('usuarioNome');
+  if (usuarioNomeEl) usuarioNomeEl.textContent = cliente.nome;
+  const roletaBtn = document.getElementById('roletaBtnFlutuante') as HTMLElement | null;
+  if (roletaBtn) roletaBtn.style.display = 'flex';
+  const usuarioTel = document.getElementById('usuarioTel');
+  if (usuarioTel) usuarioTel.textContent = cliente.telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+  const inpNome = document.getElementById('inpNome') as HTMLInputElement | null;
+  if (inpNome) inpNome.value = cliente.nome;
+  const inpEndereco = document.getElementById('inpEndereco') as HTMLTextAreaElement | null;
+  if (inpEndereco && cliente.endereco) inpEndereco.value = cliente.endereco;
+}
+
+async function verificarTelefone(): Promise<void> {
+  if (_verificando) return;
+  const telInput = document.getElementById('loginTelefone') as HTMLInputElement;
+  const erro = document.getElementById('loginErro');
+  const tel = telInput.value.replace(/\D/g, '');
+  if (tel.length < 10) {
+    if (erro) { erro.textContent = 'Digite um número válido com DDD.'; erro.style.display = 'block'; }
+    return;
+  }
+  if (erro) erro.style.display = 'none';
+  const btn = document.querySelector('#etapaTelefone button') as HTMLButtonElement | null;
+  if (btn) { btn.textContent = 'Verificando...'; btn.disabled = true; }
+  _verificando = true;
+  try {
+    const dados = await dbGet<Cliente>('clientes', `telefone=eq.${tel}&limit=1`);
+    if (!Array.isArray(dados)) throw new Error('Resposta inválida');
+    if (dados.length > 0) {
+      entrarComCliente(dados[0]!);
+    } else {
+      const etapaTel = document.getElementById('etapaTelefone');
+      const etapaCad = document.getElementById('etapaCadastro');
+      if (etapaTel) etapaTel.style.display = 'none';
+      if (etapaCad) etapaCad.style.display = 'block';
+      (telInput as HTMLInputElement & { dataset: DOMStringMap }).dataset['tel'] = tel;
+      document.getElementById('loginNome')?.focus();
+    }
+  } catch {
+    if (erro) { erro.textContent = 'Sem conexão ou erro no servidor. Tente novamente.'; erro.style.display = 'block'; }
+  } finally {
+    if (btn) { btn.textContent = 'Continuar →'; btn.disabled = false; }
+    _verificando = false;
+  }
+}
+
+async function cadastrar(): Promise<void> {
+  if (_cadastrando) return;
+  const nomeInput = document.getElementById('loginNome') as HTMLInputElement;
+  const telInput = document.getElementById('loginTelefone') as HTMLInputElement;
+  const nome = normalizarNome(nomeInput.value);
+  const tel = (telInput as HTMLInputElement & { dataset: DOMStringMap }).dataset['tel'] ?? '';
+  const erro = document.getElementById('cadastroErro');
+  if (!nome) {
+    if (erro) { erro.textContent = 'Digite seu nome.'; erro.style.display = 'block'; }
+    return;
+  }
+  if (erro) erro.style.display = 'none';
+  const btn = document.querySelector('#etapaCadastro button') as HTMLButtonElement | null;
+  if (btn) { btn.textContent = 'Entrando...'; btn.disabled = true; }
+  _cadastrando = true;
+  try {
+    const dados = await dbPost<Cliente>('clientes', { nome, telefone: tel, endereco: '' });
+    if (dados) {
+      entrarComCliente(dados);
+    } else {
+      throw new Error('Resposta inválida');
+    }
+  } catch {
+    if (erro) { erro.textContent = 'Erro ao cadastrar. Verifique sua conexão e tente novamente.'; erro.style.display = 'block'; }
+  } finally {
+    if (btn) { btn.textContent = 'Entrar no cardápio ✨'; btn.disabled = false; }
+    _cadastrando = false;
+  }
+}
+
+function voltarEtapaTelefone(): void {
+  const etapaCad = document.getElementById('etapaCadastro');
+  const etapaTel = document.getElementById('etapaTelefone');
+  if (etapaCad) etapaCad.style.display = 'none';
+  if (etapaTel) etapaTel.style.display = 'block';
+}
+
+function sair(): void {
+  if (!confirm('Deseja sair da sua conta?')) return;
+  clienteAtual = null;
+  limparSessao();
+  const usuarioBar = document.getElementById('usuarioBar');
+  if (usuarioBar) usuarioBar.style.display = 'none';
+  (document.getElementById('inpNome') as HTMLInputElement).value = '';
+  (document.getElementById('inpEndereco') as HTMLTextAreaElement).value = '';
+  (document.getElementById('loginTelefone') as HTMLInputElement).value = '';
+  const etapaTel = document.getElementById('etapaTelefone');
+  const etapaCad = document.getElementById('etapaCadastro');
+  if (etapaTel) etapaTel.style.display = 'block';
+  if (etapaCad) etapaCad.style.display = 'none';
+  document.getElementById('loginOverlay')!.style.display = 'flex';
+}
+
+function mostrarLogin(): void {
+  document.getElementById('loginOverlay')!.style.display = 'flex';
+  setTimeout(() => (document.getElementById('loginTelefone') as HTMLInputElement)?.focus(), 300);
+}
+
+// ===== ROLETA UI =====
+async function abrirRoleta(): Promise<void> {
+  const bd = document.getElementById('roletaBackdrop');
+  if (!bd) return;
+  bd.classList.add('aberto');
+  document.body.classList.add('modal-aberto');
+  document.getElementById('roletaStatusBox')!.innerHTML = '';
+  document.getElementById('roletaInativa')!.style.display = 'none';
+  document.getElementById('roletaNaoLogado')!.style.display = 'none';
+  document.getElementById('roletaInstrucoes')!.style.display = 'block';
+  document.getElementById('roletaBtnEnviarWrap')!.style.display = 'block';
+  document.getElementById('roletaWheelSection')!.style.display = 'none';
+  document.getElementById('roletaJaGirou')!.style.display = 'none';
+  document.getElementById('roletaResultado')!.classList.remove('visivel');
+
+  const cfg = await carregarConfigRoleta();
+  const premios = getPremios();
+
+  // Atualizar grid de prêmios
+  const grid = document.getElementById('roletaPremiosGrid');
+  if (grid) {
+    const icones = ['🍫', '🧁', '🚚', '💸', '💰', '🎉', '🍮', '🎀', '🌟'];
+    grid.innerHTML = premios.map((p, i) => `<div class="roleta-premio-item">${icones[i % icones.length]} ${escHTML(p)}</div>`).join('');
+  }
+
+  if (cfg && !cfg.ativa) {
+    document.getElementById('roletaInativa')!.style.display = 'block';
+    document.getElementById('roletaInstrucoes')!.style.display = 'none';
+  }
+
+  desenharRoleta(premios);
+  document.getElementById('roletaWheelSection')!.style.display = 'block';
+
+  if (!clienteAtual) {
+    document.getElementById('roletaNaoLogado')!.style.display = 'none';
+    document.getElementById('roletaInstrucoes')!.style.display = 'none';
+    const girarBtn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
+    if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
+    return;
+  }
+
+  const status = await verificarStatusRoleta(clienteAtual.id);
+  atualizarUIRoleta(status);
+}
+
+function fecharRoleta(): void {
+  document.getElementById('roletaBackdrop')?.classList.remove('aberto');
+  document.body.classList.remove('modal-aberto');
+}
+
+function fecharRoletaBackdrop(e: Event): void {
+  if ((e.target as HTMLElement).id === 'roletaBackdrop') fecharRoleta();
+}
+
+function atualizarUIRoleta(info: Participacao | null): void {
+  const statusBox = document.getElementById('roletaStatusBox')!;
+  const instrucoes = document.getElementById('roletaInstrucoes')!;
+  const btnEnviar = document.getElementById('roletaBtnEnviarWrap')!;
+  const wheelSection = document.getElementById('roletaWheelSection')!;
+  const jaGirou = document.getElementById('roletaJaGirou')!;
+  const girarBtn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
+
+  wheelSection.style.display = 'block';
+  desenharRoleta(getPremios());
+
+  if (isContaTeste(clienteAtual)) {
+    if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
+    statusBox.innerHTML = '';
+    instrucoes.style.display = 'none';
+    btnEnviar.style.display = 'none';
+    jaGirou.style.display = 'none';
+    return;
+  }
+
+  if (!info) {
+    statusBox.innerHTML = '';
+    instrucoes.style.display = 'block';
+    btnEnviar.style.display = 'block';
+    jaGirou.style.display = 'none';
+    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; girarBtn.title = 'Envie suas provas para liberar a roleta'; }
+    return;
+  }
+
+  if (info.status === 'pendente') {
+    statusBox.innerHTML = '<div class="roleta-status-box roleta-status-pendente">⏳ <div><strong>Participação enviada!</strong><br>Suas provas estão em análise. Aguarde a aprovação (até 24h).</div></div>';
+    instrucoes.style.display = 'block'; btnEnviar.style.display = 'none'; jaGirou.style.display = 'none';
+    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; girarBtn.title = 'Aguardando aprovação'; }
+  } else if (info.status === 'rejeitado') {
+    statusBox.innerHTML = '<div class="roleta-status-box roleta-status-rejeitado">❌ <div><strong>Participação não aprovada.</strong><br>Tente novamente cumprindo todos os requisitos.</div></div>';
+    instrucoes.style.display = 'block'; btnEnviar.style.display = 'block'; jaGirou.style.display = 'none';
+    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; }
+  } else if (info.status === 'aprovado' && !info.ja_girou) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const diaAprovacao = info.data_aprovacao ? info.data_aprovacao.split('T')[0] : null;
+    if (diaAprovacao !== hoje) {
+      statusBox.innerHTML = '<div class="roleta-status-box roleta-status-rejeitado">⏰ <div><strong>Prazo expirado.</strong><br>Você foi aprovado em outro dia e não girou a tempo. Envie novas provas para participar novamente.</div></div>';
+      instrucoes.style.display = 'none'; btnEnviar.style.display = 'block'; jaGirou.style.display = 'none';
+      if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; girarBtn.textContent = '🔒 Prazo expirado'; }
+    } else {
+      statusBox.innerHTML = '<div class="roleta-status-box roleta-status-aprovado">✅ <div><strong>Aprovado! Gire hoje!</strong><br>Você tem até meia-noite para usar seu giro. Não acumula!</div></div>';
+      instrucoes.style.display = 'none'; btnEnviar.style.display = 'none'; jaGirou.style.display = 'none';
+      if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
+    }
+  } else if (info.ja_girou && !isContaTeste(clienteAtual)) {
+    statusBox.innerHTML = '';
+    instrucoes.style.display = 'none'; btnEnviar.style.display = 'none'; jaGirou.style.display = 'block';
+    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; }
+    const premioEl = document.getElementById('roletaJaGirouPremio');
+    if (premioEl) {
+      premioEl.innerHTML = info.premio
+        ? 'Seu prêmio foi: <strong style="color:var(--rosa)">' + escHTML(info.premio) + '</strong>. Entre em contato conosco para resgatar!'
+        : 'Você já usou sua chance nesta campanha.';
+    }
+  }
+}
+
+async function girarRoleta(): Promise<void> {
+  if (!clienteAtual) { mostrarToast('Faça login para girar a roleta!', 'erro'); return; }
+
+  const statusGiro = await verificarStatusRoleta(clienteAtual.id);
+  if (!isContaTeste(clienteAtual)) {
+    if (!statusGiro || statusGiro.status !== 'aprovado' || statusGiro.ja_girou) {
+      mostrarToast('Você precisa ser aprovado pela equipe antes de girar!', 'erro');
+      return;
+    }
+    // Verificar limite de vencedores semanais
+    try {
+      const semana = getSemanaAtual();
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_vencedores?semana=eq.${semana}&select=id`, {
+        headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
+      });
+      const vencedores = await resp.json() as Array<{ id: number }>;
+      const cfgResp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_config?id=eq.1&select=max_vencedores_semana`, {
+        headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
+      });
+      const cfg = await cfgResp.json() as Array<{ max_vencedores_semana: number }>;
+      const limite = cfg[0]?.max_vencedores_semana ?? 1;
+      if (vencedores.length >= limite) {
+        const btn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
+        const resultEl = document.getElementById('roletaResultado');
+        if (resultEl) {
+          resultEl.innerHTML = '⚠️ <strong>Já temos um ganhador esta semana!</strong><br><small>A próxima rodada começa na semana que vem. Fique de olho!</small>';
+          resultEl.classList.add('visivel');
+        }
+        return;
+      }
+    } catch (e) { console.warn('Erro ao verificar limite semanal:', e); }
+  }
+
+  await girarRoletaFn(clienteAtual, (premio: string) => {
+    const resultEl = document.getElementById('roletaResultado');
+    if (resultEl) {
+      resultEl.innerHTML = '🎉 Você ganhou: <strong style="color:var(--rosa)">' + escHTML(premio) + '</strong>!<br><small style="font-size:13px;color:var(--texto-sec)">Entre em contato conosco pelo WhatsApp para resgatar seu prêmio!</small>';
+      resultEl.classList.add('visivel');
+    }
+    const btn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
+    if (btn) btn.textContent = '✓ Girado!';
+    if (clienteAtual) salvarVencedor(clienteAtual, premio).catch(console.error);
+  });
+}
+
+async function enviarProvasWhatsApp(): Promise<void> {
+  if (!clienteAtual) { alert('Faça login antes de enviar suas provas.'); return; }
+  const statusAtual = await verificarStatusRoleta(clienteAtual.id);
+  if (statusAtual && (statusAtual.status === 'pendente' || statusAtual.status === 'aprovado')) {
+    atualizarUIRoleta(statusAtual);
+    return;
+  }
+  const nome = clienteAtual.nome || '';
+  const tel = clienteAtual.telefone || '';
+  const instEl = document.getElementById('roletaInstagramInput') as HTMLInputElement | null;
+  const instagram = instEl ? instEl.value.trim() : '';
+  const msg = 'Olá, equipe Gelamour! Quero participar da Roleta VIP.%0A%0ANome: ' + encodeURIComponent(nome) +
+    '%0ATelefone: ' + encodeURIComponent(tel) +
+    (instagram ? '%0AInstagram: ' + encodeURIComponent(instagram) : '') +
+    '%0A%0AEstou enviando a foto dos meus 5 adesivos e o print do Story para validação!';
+  window.open('https://wa.me/' + WA_NUMBER + '?text=' + msg, '_blank');
+  await registrarParticipacao(instagram);
+  atualizarUIRoleta({ status: 'pendente', ja_girou: false } as Participacao);
+}
+
+async function registrarParticipacao(instagram: string): Promise<void> {
+  if (!clienteAtual) return;
+  try {
+    const check = await verificarStatusRoleta(clienteAtual.id);
+    if (check && check.status !== 'rejeitado') return;
+    const semana = getSemanaAtual();
+    await dbPost<Participacao>('roleta_participacoes', {
+      cliente_id: clienteAtual.id,
+      nome: clienteAtual.nome,
+      telefone: clienteAtual.telefone,
+      instagram: instagram || null,
+      status: 'pendente',
+      semana,
+    } as Partial<Participacao>);
+  } catch (e) { console.warn('Erro ao registrar participação:', e); }
+}
+
+// ===== ADMIN ROLETA =====
+function verificarAdmin(): boolean {
+  return isAdmin(clienteAtual);
+}
+
+async function abrirRoletaAdmin(): Promise<void> {
+  if (!verificarAdmin()) { alert('Acesso restrito.'); return; }
+  document.getElementById('roletaAdminBackdrop')?.classList.add('aberto');
+  await carregarParticipantesRoleta();
+  await carregarConfigAdmin();
+}
+
+function fecharRoletaAdmin(): void {
+  document.getElementById('roletaAdminBackdrop')?.classList.remove('aberto');
+}
+
+function fecharRoletaAdminBackdrop(e: Event): void {
+  if ((e.target as HTMLElement).id === 'roletaAdminBackdrop') fecharRoletaAdmin();
+}
+
+function abrirTabAdmin(tab: string, btn: HTMLElement): void {
+  document.querySelectorAll('.roleta-admin-tab').forEach(t => t.classList.remove('ativo'));
+  document.querySelectorAll('.roleta-admin-panel').forEach(p => p.classList.remove('ativo'));
+  btn.classList.add('ativo');
+  const tabId = 'tab' + tab.charAt(0).toUpperCase() + tab.slice(1);
+  document.getElementById(tabId)?.classList.add('ativo');
+  if (tab === 'pendentes') carregarParticipantesRoleta();
+  else if (tab === 'aprovados') carregarAprovadosRoleta();
+  else if (tab === 'vencedores') carregarVencedoresRoleta();
+  else if (tab === 'config') carregarConfigAdmin();
+}
+
+async function carregarParticipantesRoleta(): Promise<void> {
+  const el = document.getElementById('listaPendentes');
+  if (!el) return;
+  el.innerHTML = '<div class="roleta-empty">Carregando...</div>';
+  try {
+    const r = await dbFetch(SUPABASE_URL + '/rest/v1/roleta_participacoes?status=eq.pendente&order=created_at.desc');
+    const data = await r.json() as Array<Participacao>;
+    if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum participante pendente.</div>'; return; }
+    el.innerHTML = data.map(p => {
+      const dt = new Date(p.created_at).toLocaleString('pt-BR');
+      return '<div class="roleta-participante-item">' +
+        '<div class="roleta-participante-info">' +
+        '<div class="roleta-participante-nome">' + escHTML(p.nome ?? '') + '</div>' +
+        '<div class="roleta-participante-tel">' + escHTML(p.telefone) + (p.instagram ? ' · @' + escHTML(p.instagram) : '') + '</div>' +
+        '<div style="font-size:11px;color:#999">' + dt + '</div>' +
+        '</div>' +
+        '<div class="roleta-participante-acoes">' +
+        '<button class="btn-aprovar" onclick="aprovarParticipante(' + p.id + ', this)">✓ Aprovar</button>' +
+        '<button class="btn-rejeitar" onclick="rejeitarParticipante(' + p.id + ', this)">✗ Rejeitar</button>' +
+        '</div></div>';
+    }).join('');
+  } catch { el.innerHTML = '<div class="roleta-empty">Erro ao carregar.</div>'; }
+}
+
+async function carregarAprovadosRoleta(): Promise<void> {
+  const el = document.getElementById('listaAprovados');
+  if (!el) return;
+  el.innerHTML = '<div class="roleta-empty">Carregando...</div>';
+  try {
+    const r = await dbFetch(SUPABASE_URL + '/rest/v1/roleta_participacoes?status=eq.aprovado&order=data_aprovacao.desc');
+    const data = await r.json() as Array<Participacao>;
+    if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum aprovado ainda.</div>'; return; }
+    el.innerHTML = data.map(p => {
+      const dt = p.data_aprovacao ? new Date(p.data_aprovacao).toLocaleString('pt-BR') : '—';
+      const girou = p.ja_girou ? '✓ Girou — ' + escHTML(p.premio ?? '') : '⏳ Aguardando girar';
+      return '<div class="roleta-participante-item">' +
+        '<div class="roleta-participante-info">' +
+        '<div class="roleta-participante-nome">' + escHTML(p.nome ?? '') + '</div>' +
+        '<div class="roleta-participante-tel">' + escHTML(p.telefone) + '</div>' +
+        '<div style="font-size:11px;color:#388e3c">' + girou + '</div>' +
+        '<div style="font-size:11px;color:#999">Aprovado em: ' + dt + '</div>' +
+        '</div></div>';
+    }).join('');
+  } catch { el.innerHTML = '<div class="roleta-empty">Erro ao carregar.</div>'; }
+}
+
+async function aprovarParticipante(id: number, btn: HTMLButtonElement): Promise<void> {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await dbPatch<Participacao>('roleta_participacoes', 'id=eq.' + id, {
+      status: 'aprovado',
+      data_aprovacao: new Date().toISOString(),
+      aprovado_por: clienteAtual ? clienteAtual.nome : 'admin'
+    } as Partial<Participacao>);
+    btn.closest('.roleta-participante-item')?.remove();
+  } catch {
+    btn.disabled = false; btn.textContent = '✓ Aprovar';
+    alert('Erro ao aprovar.');
+  }
+}
+
+async function rejeitarParticipante(id: number, btn: HTMLButtonElement): Promise<void> {
+  if (!confirm('Rejeitar esta participação?')) return;
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await dbPatch<Participacao>('roleta_participacoes', 'id=eq.' + id, { status: 'rejeitado' });
+    btn.closest('.roleta-participante-item')?.remove();
+  } catch {
+    btn.disabled = false; btn.textContent = '✗ Rejeitar';
+    alert('Erro ao rejeitar.');
+  }
+}
+
+async function carregarVencedoresRoleta(): Promise<void> {
+  const el = document.getElementById('listaVencedores');
+  if (!el) return;
+  el.innerHTML = '<div class="roleta-empty">Carregando...</div>';
+  try {
+    const r = await dbFetch(SUPABASE_URL + '/rest/v1/roleta_vencedores?order=data_vitoria.desc');
+    const data = await r.json() as Array<{ nome?: string; premio: string; telefone?: string; semana?: string; data_vitoria: string }>;
+    if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum vencedor ainda.</div>'; return; }
+    el.innerHTML = data.map(v => {
+      const dt = new Date(v.data_vitoria).toLocaleString('pt-BR');
+      return '<div class="roleta-vencedor-item">' +
+        '<div class="roleta-vencedor-nome">🏆 ' + escHTML(v.nome ?? '—') + '</div>' +
+        '<div class="roleta-vencedor-premio">🎁 ' + escHTML(v.premio) + '</div>' +
+        '<div class="roleta-vencedor-data">' + escHTML(v.telefone ?? '') + ' · Semana ' + escHTML(v.semana ?? '') + ' · ' + dt + '</div>' +
+        '</div>';
+    }).join('');
+  } catch { el.innerHTML = '<div class="roleta-empty">Erro ao carregar.</div>'; }
+}
+
+async function carregarConfigAdmin(): Promise<void> {
+  try {
+    const r = await dbFetch(SUPABASE_URL + '/rest/v1/roleta_config?id=eq.1&limit=1');
+    const data = await r.json() as Array<{ ativa: boolean; premios: string[] }>;
+    if (data && data[0]) {
+      (document.getElementById('configAtiva') as HTMLInputElement).checked = data[0]!.ativa;
+      const premios = Array.isArray(data[0]!.premios) ? data[0]!.premios : getPremiosPadrao();
+      (document.getElementById('configPremios') as HTMLTextAreaElement).value = premios.join('\n');
+    }
+  } catch (e) { console.warn('Erro ao carregar config admin:', e); }
+}
+
+async function salvarConfigRoleta(): Promise<void> {
+  const ativa = (document.getElementById('configAtiva') as HTMLInputElement).checked;
+  const premiosTxt = (document.getElementById('configPremios') as HTMLTextAreaElement).value;
+  const premios = premiosTxt.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  const msgEl = document.getElementById('configMsg') as HTMLElement | null;
+  try {
+    await dbPatch<{ ativa: boolean; premios: string[]; updated_at: string }>('roleta_config', 'id=eq.1', {
+      ativa, premios, updated_at: new Date().toISOString()
+    });
+    setPremios(premios);
+    if (msgEl) { msgEl.style.display = 'block'; setTimeout(() => { msgEl.style.display = 'none'; }, 2500); }
+  } catch { alert('Erro ao salvar configurações.'); }
+}
+
+// ===== INIT =====
+(async function init(): Promise<void> {
+  try {
+    const saved = sessionStorage.getItem('gelamour_cliente');
+    const ts = Number(sessionStorage.getItem('gelamour_ts') ?? '0');
+    if (saved && Date.now() - ts < 24 * 60 * 60 * 1000) {
+      const cliente = JSON.parse(saved) as Cliente;
+      // Revalidar no banco
+      const dados = await dbGet<Cliente>('clientes', `telefone=eq.${normalizarTelefone(cliente.telefone)}&limit=1`);
+      if (dados && dados.length > 0) {
+        entrarComCliente(dados[0]!);
+        return;
+      }
+    }
+    sessionStorage.removeItem('gelamour_cliente');
+    sessionStorage.removeItem('gelamour_ts');
+  } catch (e) { console.warn('Erro ao verificar sessão:', e); }
+  mostrarLogin();
+})();
+
+// PWA service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// Sincronizar cardápio com Supabase
+(async function sincronizarCardapio(): Promise<void> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), DB_TIMEOUT);
+    const r = await fetch(SUPABASE_URL + '/rest/v1/produtos?select=nome,preco,disponivel', {
+      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
+      signal: ctrl.signal
+    });
+    clearTimeout(timer);
+    if (!r.ok) return;
+    const prods = await r.json() as Array<{ nome: string; preco: number; disponivel: boolean }>;
+    if (!Array.isArray(prods) || !prods.length) return;
+    const mapa: Record<string, { nome: string; preco: number; disponivel: boolean }> = {};
+    prods.forEach(p => {
+      if (p && typeof p.nome === 'string' && p.nome.trim()) mapa[p.nome.trim().toLowerCase()] = p;
+    });
+    document.querySelectorAll('.btn-pedir').forEach(btn => {
+      const onclickAttr = btn.getAttribute('onclick') ?? '';
+      const m = onclickAttr.match(/pedirProduto\(this,'(.+?)',(\d+(?:\.\d+)?)\)/);
+      if (!m) return;
+      const nomeProd = m[1]!;
+      const chave = nomeProd.trim().toLowerCase();
+      const db = mapa[chave];
+      if (!db) return;
+      const card = btn.closest('.prod-card') as HTMLElement | null;
+      if (!card) return;
+      if (db.disponivel === false) { card.style.display = 'none'; return; }
+      const novoPreco = parseFloat(String(db.preco));
+      if (isNaN(novoPreco) || novoPreco <= 0) return;
+      btn.setAttribute('onclick', "pedirProduto(this,'" + nomeProd.replace(/'/g, "\\'") + "'," + novoPreco + ")");
+      const precoEl = card.querySelector('.prod-preco');
+      if (precoEl) precoEl.textContent = 'R$ ' + novoPreco.toFixed(2).replace('.', ',');
+    });
+  } catch { /* silencioso */ }
+})();
+
+// Fechar modais com Escape
+document.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    fecharDialog();
+    fecharModal();
+    fecharConfirmWA();
+    cancelarPix();
+  }
+});
+
+// ===== EXPOR PARA HTML (onclick="...") =====
+declare global {
+  interface Window {
+    filtrar: typeof filtrar;
+    pedirProduto: typeof pedirProduto;
+    abrirDialog: typeof abrirDialog;
+    fecharDialog: typeof fecharDialog;
+    fecharDialogBackdrop: typeof fecharDialogBackdrop;
+    irParaFinalizar: typeof irParaFinalizar;
+    abrirModal: typeof abrirModal;
+    fecharModal: typeof fecharModal;
+    fecharModalBackdrop: typeof fecharModalBackdrop;
+    removerDoCarrinho: typeof removerDoCarrinho;
+    selecionarPagamento: typeof selecionarPagamento;
+    finalizarPedido: typeof finalizarPedido;
+    confirmarEnvioWA: typeof confirmarEnvioWA;
+    fecharConfirmWA: typeof fecharConfirmWA;
+    pedirBoloForma: typeof pedirBoloForma;
+    abrirDialogBolo: typeof abrirDialogBolo;
+    fecharDialogBolo: typeof fecharDialogBolo;
+    agendarBoloWhatsApp: typeof agendarBoloWhatsApp;
+    carouselNext: typeof carouselNext;
+    carouselPrev: typeof carouselPrev;
+    copiarPix: typeof copiarPix;
+    cancelarPix: typeof cancelarPix;
+    pixJaPaguei: typeof pixJaPaguei;
+    selecionarTipoCartao: typeof selecionarTipoCartao;
+    formatarCartao: typeof formatarCartao;
+    formatarCpf: typeof formatarCpf;
+    formatarValidade: typeof formatarValidade;
+    formatarCep: typeof formatarCep;
+    pagarCartao: typeof pagarCartao;
+    fecharReciboPix: typeof fecharReciboPix;
+    mascaraTelefone: typeof mascaraTelefone;
+    verificarTelefone: typeof verificarTelefone;
+    cadastrar: typeof cadastrar;
+    voltarEtapaTelefone: typeof voltarEtapaTelefone;
+    sair: typeof sair;
+    abrirRoleta: typeof abrirRoleta;
+    fecharRoleta: typeof fecharRoleta;
+    fecharRoletaBackdrop: typeof fecharRoletaBackdrop;
+    girarRoleta: typeof girarRoleta;
+    enviarProvasWhatsApp: typeof enviarProvasWhatsApp;
+    abrirRoletaAdmin: typeof abrirRoletaAdmin;
+    fecharRoletaAdmin: typeof fecharRoletaAdmin;
+    fecharRoletaAdminBackdrop: typeof fecharRoletaAdminBackdrop;
+    abrirTabAdmin: typeof abrirTabAdmin;
+    aprovarParticipante: typeof aprovarParticipante;
+    rejeitarParticipante: typeof rejeitarParticipante;
+    salvarConfigRoleta: typeof salvarConfigRoleta;
+  }
+}
+
+Object.assign(window, {
+  filtrar,
+  pedirProduto,
+  abrirDialog,
+  fecharDialog,
+  fecharDialogBackdrop,
+  irParaFinalizar,
+  abrirModal,
+  fecharModal,
+  fecharModalBackdrop,
+  removerDoCarrinho,
+  selecionarPagamento,
+  finalizarPedido,
+  confirmarEnvioWA,
+  fecharConfirmWA,
+  pedirBoloForma,
+  abrirDialogBolo,
+  fecharDialogBolo,
+  agendarBoloWhatsApp,
+  carouselNext,
+  carouselPrev,
+  copiarPix,
+  cancelarPix,
+  pixJaPaguei,
+  selecionarTipoCartao,
+  formatarCartao,
+  formatarCpf,
+  formatarValidade,
+  formatarCep,
+  pagarCartao,
+  fecharReciboPix,
+  mascaraTelefone,
+  verificarTelefone,
+  cadastrar,
+  voltarEtapaTelefone,
+  sair,
+  abrirRoleta,
+  fecharRoleta,
+  fecharRoletaBackdrop,
+  girarRoleta,
+  enviarProvasWhatsApp,
+  abrirRoletaAdmin,
+  fecharRoletaAdmin,
+  fecharRoletaAdminBackdrop,
+  abrirTabAdmin,
+  aprovarParticipante,
+  rejeitarParticipante,
+  salvarConfigRoleta,
+});
