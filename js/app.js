@@ -1,7 +1,7 @@
 
     const WA_NUMBER = atob('NTUxMTk0MDc3Mjc1MA==');
     const CONTA_TESTE = atob('MTE5NjUwMzAwNzY=');
-    function isContaTeste() { return clienteAtual && clienteAtual.telefone.replace(/D/g,'') === CONTA_TESTE; }
+    function isContaTeste() { return clienteAtual && clienteAtual.telefone.replace(/\D/g,'') === CONTA_TESTE; }
 
     const carrinho = {};
     let pagamentoSelecionado = '';
@@ -13,6 +13,25 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    // Toast simples para feedback não-bloqueante
+    function mostrarToast(msg, tipo) {
+      const old = document.getElementById('_toast');
+      if (old) old.remove();
+      const t = document.createElement('div');
+      t.id = '_toast';
+      t.textContent = msg;
+      const bg = tipo === 'erro' ? '#ef4444' : tipo === 'ok' ? '#22c55e' : '#4A2C17';
+      Object.assign(t.style, {
+        position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
+        background: bg, color: '#fff', padding: '12px 22px', borderRadius: '30px',
+        fontSize: '14px', fontWeight: '600', zIndex: '99999',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.3)', maxWidth: '90vw', textAlign: 'center',
+        transition: 'opacity .3s', opacity: '1', fontFamily: "'DM Sans', sans-serif"
+      });
+      document.body.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 350); }, 3500);
     }
 
     function filtrar(cat, btn) {
@@ -438,6 +457,10 @@ Pedido pelo cardápio online ✨`;
             }
           }),
         });
+        if (!resp.ok) {
+          const errTxt = await resp.text().catch(function(){ return ''; });
+          throw new Error('HTTP ' + resp.status + (errTxt ? ' — ' + errTxt.slice(0, 100) : ''));
+        }
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
 
@@ -518,7 +541,7 @@ Pedido pelo cardápio online ✨`;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(_pixPayload).then(function() {
           const btn = document.querySelector('.pix-copy-btn');
-          if (btn) { btn.textContent = '✅ Código copiado!'; setTimeout(function(){ btn.textContent = '📋 Copiar código Pix (copia e cola)'; }, 2500); }
+          if (btn) { btn.textContent = '✅ Código copiado!'; setTimeout(function(){ btn.textContent = '📋 Copiar chave Pix'; }, 2500); }
         });
       } else {
         const ta = document.createElement('textarea');
@@ -714,9 +737,16 @@ Pedido pelo cardápio online ✨`;
 
     let _loginTentativas = 0;
     let _loginBloqueioAte = 0;
-        let _verificando = false;
+    let _verificando = false;
     async function verificarTelefone() {
       if (_verificando) return;
+      if (_loginBloqueioAte && Date.now() < _loginBloqueioAte) {
+        const seg = Math.ceil((_loginBloqueioAte - Date.now()) / 1000);
+        const erro = document.getElementById('loginErro');
+        erro.textContent = 'Muitas tentativas. Aguarde ' + seg + ' segundo(s) antes de tentar novamente.';
+        erro.style.display = 'block';
+        return;
+      }
       const tel = document.getElementById('loginTelefone').value.replace(/\D/g, '');
       const erro = document.getElementById('loginErro');
       if (tel.length < 10) { erro.textContent = 'Digite um número válido com DDD.'; erro.style.display = 'block'; return; }
@@ -1323,7 +1353,8 @@ Pedido pelo cardápio online ✨`;
         roda.style.transformOrigin = '200px 200px';
         roda.style.transform = 'rotate(' + rotacaoFinal + 'deg)';
       }
-      _roletaRotacaoAtual = rotacaoFinal % 360;
+      // Normalizar para evitar acúmulo de graus em giros infinitos (conta teste)
+      _roletaRotacaoAtual = ((rotacaoFinal % 360) + 360) % 360;
 
       // Aguardar animação
       await new Promise(res => setTimeout(res, 4200));
@@ -1372,8 +1403,7 @@ Pedido pelo cardápio online ✨`;
     // O número de admin (WA_NUMBER decodificado) é o critério de acesso
     function verificarAdmin() {
       if (!clienteAtual) return false;
-      // Admin é identificado pelo telefone cadastrado como admin
-      const ADMIN_TEL = '11940772750'; // número sem formatação do WA_NUMBER
+      const ADMIN_TEL = atob('MTE5NDA3NzI3NTA=');
       const telCliente = (clienteAtual.telefone || '').replace(/\D/g, '');
       return telCliente === ADMIN_TEL;
     }

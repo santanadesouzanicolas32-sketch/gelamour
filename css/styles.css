@@ -325,14 +325,14 @@
     }
 
     .footer-dev {
-      .footer-dev {
-        margin-top: 8px;
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.35);
-        letter-spacing: 0.3px;
-        line-height: 1.7;
-      }
+      margin-top: 8px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.35);
+      letter-spacing: 0.3px;
+      line-height: 1.7;
+    }
 
+    .footer-dev a {
       color: rgba(255, 255, 255, 0.5);
       text-decoration: none;
       transition: color 0.2s;
