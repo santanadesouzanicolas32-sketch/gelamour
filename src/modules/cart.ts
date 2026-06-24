@@ -1,44 +1,42 @@
 import type { ItemCarrinho } from '../types';
 import { escHTML } from '../utils/security';
 import { formatarMoeda } from '../utils/format';
+import { cartService } from '../container';
 
-const _carrinho: Record<string, ItemCarrinho> = {};
-
+// Adaptadores legados — delegam ao CartService (Clean Architecture)
 export function getCarrinho(): Record<string, ItemCarrinho> {
-  return _carrinho;
+  const result: Record<string, ItemCarrinho> = {};
+  cartService.getItems().forEach(i => { result[i.nome] = i; });
+  return result;
 }
 
 export function getItens(): ItemCarrinho[] {
-  return Object.values(_carrinho);
+  return Array.from(cartService.getItems()) as ItemCarrinho[];
 }
 
 export function getTotal(): number {
-  return getItens().reduce((s, i) => Math.round((s + i.preco) * 100) / 100, 0);
+  return cartService.getTotal();
 }
 
 export function adicionarItem(nome: string, preco: number): boolean {
-  if (_carrinho[nome]) return false;
-  _carrinho[nome] = { nome, preco: Number(preco) };
+  if (cartService.has(nome)) return false;
+  cartService.add(nome, preco);
   return true;
 }
 
 export function removerItem(nome: string): boolean {
-  if (!_carrinho[nome]) return false;
-  delete _carrinho[nome];
+  if (!cartService.has(nome)) return false;
+  cartService.remove(nome);
   return true;
 }
 
 export function toggleItem(nome: string, preco: number): 'adicionado' | 'removido' {
-  if (_carrinho[nome]) {
-    removerItem(nome);
-    return 'removido';
-  }
-  adicionarItem(nome, preco);
-  return 'adicionado';
+  const r = cartService.toggle(nome, preco);
+  return r === 'added' ? 'adicionado' : 'removido';
 }
 
 export function limpar(): void {
-  Object.keys(_carrinho).forEach(k => delete _carrinho[k]);
+  cartService.clear();
 }
 
 export function isBoloForma(nome: string): boolean {

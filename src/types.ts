@@ -1,5 +1,5 @@
 export interface Cliente {
-  id: number;
+  id: number | undefined;
   nome: string;
   telefone: string;
   endereco?: string;
