@@ -1,9 +1,36 @@
-backend/node_modules/
-backend/.env
+# Dependências
 node_modules/
-package-lock.json
-package.json
+backend/node_modules/
+
+# Ambiente
+backend/.env
+.env
+.env.local
+
+# Supabase
+supabase/.temp/
+
+# Build
+dist/
+build/
+
+# Logs
 *.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários do projeto
 logo_b64.txt
 logo_temp.jpg
-supabase/.temp/
+
+# Pacotes (não precisam ser commitados para site estático)
+package-lock.json
+package.json
