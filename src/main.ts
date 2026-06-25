@@ -439,6 +439,7 @@ async function iniciarFluxoPix(
     // Timeout de 30 min — cancela polling se ninguém pagar
     _pixPollTimeoutTimer = setTimeout(() => {
       if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
+      _pixPollTimeoutTimer = null;
       if (pixStatus) { pixStatus.textContent = '⏰ Tempo esgotado. Gere um novo Pix se precisar.'; pixStatus.className = 'pix-status'; }
       if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
     }, 30 * 60 * 1000);
@@ -486,7 +487,7 @@ async function pagarCartao(): Promise<void> {
 }
 
 async function verificarPagamentoPix(): Promise<void> {
-  if (!_pixPedidoId) return;
+  if (!_pixPedidoId || _pixCancelled) return;
   const result = await pedidoRepository.findById(_pixPedidoId);
   if (result.ok && result.value) {
     const statusPag = result.value.statusPagamento;
