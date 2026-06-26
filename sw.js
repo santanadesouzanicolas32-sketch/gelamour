@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const STATIC_CACHE = `gelamour-static-${CACHE_VERSION}`;
 const IMAGE_CACHE  = `gelamour-images-${CACHE_VERSION}`;
 const API_CACHE    = `gelamour-api-${CACHE_VERSION}`;
@@ -67,7 +67,22 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 4. CSS/JS: cache first, update em background
+  // 4. app.js: network first (sempre busca versão mais recente)
+  if (request.url.includes('/js/app.js')) {
+    event.respondWith(
+      fetch(request)
+        .then(resp => {
+          if (resp.ok) {
+            caches.open(STATIC_CACHE).then(c => c.put(request, resp.clone()));
+          }
+          return resp;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // 5. CSS e demais scripts: cache first, update em background
   if (request.destination === 'style' || request.destination === 'script') {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async cache => {

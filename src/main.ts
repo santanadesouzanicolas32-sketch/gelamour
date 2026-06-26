@@ -613,9 +613,10 @@ async function verificarTelefone(): Promise<void> {
   try {
     const result = await loginUseCase.execute(telInput.value);
     if (!result.ok) {
-      const msg = result.error.name === 'NetworkError'
-        ? 'Sem conexão. Verifique sua internet e tente novamente.'
-        : result.error.message;
+      const isUserMsg = result.error.name === 'ValidationError' || result.error.name === 'RateLimitError';
+      const msg = isUserMsg
+        ? result.error.message
+        : 'Sem conexão com o servidor. Verifique sua internet e tente novamente.';
       log.error('verificarTelefone falhou', { error: result.error.message });
       if (erro) { erro.textContent = msg; erro.style.display = 'block'; }
       return;
@@ -656,7 +657,9 @@ async function cadastrar(): Promise<void> {
   try {
     const result = await loginUseCase.register(nome, tel, '');
     if (!result.ok) {
-      if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
+      const isUserMsg = result.error.name === 'ValidationError' || result.error.name === 'RateLimitError';
+      const cadastroMsg = isUserMsg ? result.error.message : 'Erro ao cadastrar. Verifique sua conexão e tente novamente.';
+      if (erro) { erro.textContent = cadastroMsg; erro.style.display = 'block'; }
       return;
     }
     entrarComCliente(result.value.toJSON() as Cliente);
