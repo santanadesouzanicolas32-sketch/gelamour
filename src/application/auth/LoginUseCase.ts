@@ -53,11 +53,14 @@ export class LoginUseCase {
     const result = await this.clienteRepo.findByTelefone(tel);
 
     if (!result.ok) {
-      this.rateLimiter.attempts++;
-      if (this.rateLimiter.attempts >= 5) {
-        this.rateLimiter.blockedUntil = Date.now() + 60_000;
-        this.rateLimiter.attempts = 0;
-        return fail(new RateLimitError(60_000));
+      // NetworkError = servidor indisponível, não tentativa inválida — não penaliza
+      if (result.error.name !== 'NetworkError') {
+        this.rateLimiter.attempts++;
+        if (this.rateLimiter.attempts >= 5) {
+          this.rateLimiter.blockedUntil = Date.now() + 60_000;
+          this.rateLimiter.attempts = 0;
+          return fail(new RateLimitError(60_000));
+        }
       }
       return fail(result.error);
     }

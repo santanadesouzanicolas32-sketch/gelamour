@@ -417,17 +417,28 @@ async function iniciarFluxoPix(
       headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
       body: JSON.stringify({ pedido_id: pedidoId, total, nome, billing_type: 'PIX' }),
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json() as { error?: string; qr_code?: string; qr_code_image?: string };
-    if (data.error) throw new Error(data.error);
+    const data = await resp.json() as { error?: string; qr_code?: string; qr_code_image?: string | null; payment_id?: string };
 
-    // Race condition: usuário cancelou enquanto aguardávamos a Edge Function
     if (_pixCancelled) return;
 
-    _pixPayload = data.qr_code || '';
-    if (pixCodeBox) pixCodeBox.textContent = _pixPayload || 'Código indisponível';
+    // HTTP 503 = cobrança criada mas QR não disponível — pede nova tentativa
+    if (resp.status === 503 || (data.error && data.error.includes('QR Code'))) {
+      if (pixStatus) { pixStatus.textContent = '⚠️ QR Code temporariamente indisponível. Aguarde 10s e feche para tentar novamente.'; pixStatus.className = 'pix-status'; }
+      if (pixCodeBox) pixCodeBox.textContent = 'Indisponível no momento.';
+      if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
+      log.warn('QR Code indisponível', { payment_id: data.payment_id });
+      return;
+    }
+
+    if (!resp.ok || data.error) throw new Error(data.error ?? 'HTTP ' + resp.status);
+
+    if (!data.qr_code) throw new Error('QR Code não retornado pelo servidor');
+
+    _pixPayload = data.qr_code;
+    if (pixCodeBox) pixCodeBox.textContent = _pixPayload;
     if (data.qr_code_image && pixQrImg) pixQrImg.src = 'data:image/png;base64,' + data.qr_code_image;
     if (pixStatus) { pixStatus.textContent = '⏳ Aguardando pagamento...'; pixStatus.className = 'pix-status pix-aguardando'; }
+
     // Mostrar botão "Já Paguei" após 20s — fallback se detecção automática falhar
     if (pixJaPagueiBtn) {
       pixJaPagueiBtn.style.display = 'none';
@@ -436,17 +447,18 @@ async function iniciarFluxoPix(
       }, 20_000);
     }
     _pixPollTimer = setInterval(verificarPagamentoPix, 4000);
-    // Timeout de 30 min — cancela polling se ninguém pagar
+    // Timeout de 30 min — cancela polling automaticamente
     _pixPollTimeoutTimer = setTimeout(() => {
       if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
       _pixPollTimeoutTimer = null;
-      if (pixStatus) { pixStatus.textContent = '⏰ Tempo esgotado. Gere um novo Pix se precisar.'; pixStatus.className = 'pix-status'; }
+      if (pixStatus) { pixStatus.textContent = '⏰ Tempo esgotado. Feche e gere um novo Pix se precisar.'; pixStatus.className = 'pix-status'; }
       if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
     }, 30 * 60 * 1000);
   } catch (e) {
+    if (_pixCancelled) return;
     log.warn('Erro ao criar Pix', { error: String(e) });
     if (pixCodeBox) pixCodeBox.textContent = 'Erro ao gerar código.';
-    if (pixStatus) { pixStatus.textContent = '⚠️ Erro ao gerar QR Code. Tente outra forma de pagamento.'; pixStatus.className = 'pix-status'; }
+    if (pixStatus) { pixStatus.textContent = '⚠️ Falha ao gerar QR Code. Verifique sua conexão e tente novamente.'; pixStatus.className = 'pix-status'; }
     if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
   }
 }
@@ -1087,13 +1099,17 @@ async function salvarConfigRoleta(): Promise<void> {
 // ===== INIT =====
 (async function init(): Promise<void> {
   try {
-    // Tenta restaurar sessão via LoginUseCase (verifica TTL + store)
     const clienteSessao = loginUseCase.restoreSession();
     if (clienteSessao) {
-      // Revalida no banco
       const result = await loginUseCase.execute(clienteSessao.telefone);
       if (result.ok && result.value.existe && result.value.cliente) {
         entrarComCliente(result.value.cliente.toJSON() as Cliente);
+        return;
+      }
+      // Falha de rede → confia na sessão local em vez de fazer logout
+      if (!result.ok && result.error.name === 'NetworkError') {
+        log.warn('Revalidação offline — usando sessão local', { tel: `***${clienteSessao.telefone.slice(-4)}` });
+        entrarComCliente(clienteSessao.toJSON() as Cliente);
         return;
       }
       loginUseCase.logout();
