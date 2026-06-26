@@ -9,7 +9,7 @@ import { Cliente as ClienteEntity } from './domain/cliente';
 import { getSemanaAtual } from './utils/format';
 import {
   getPremios, getPremiosPadrao, setPremios,
-  getParticipacaoId, setParticipacaoId,
+  setParticipacaoId,
   carregarConfig as carregarConfigRoleta,
   verificarStatus as verificarStatusRoleta,
   girar as girarRoletaFn,
@@ -34,10 +34,8 @@ let _pixCancelled = false; // flag para evitar race condition no timer
 let _pixPedidoId: number | null = null;
 let _pixMsgWA = '';
 let _pixTotal = 0;
-let _pixNome = '';
 let _pixItens: Array<{ nome: string; preco: number }> = [];
 let _pixEndereco = '';
-let _cardTipo = 'credito';
 
 let _verificando = false;
 let _cadastrando = false;
@@ -380,7 +378,6 @@ async function iniciarFluxoPix(
   _pixPedidoId = pedidoId;
   _pixMsgWA = msgWA;
   _pixTotal = total;
-  _pixNome = nome;
   _pixItens = itens || [];
   _pixEndereco = endereco || '';
   const isPix = billingType !== 'CREDIT_CARD';
@@ -464,7 +461,6 @@ async function iniciarFluxoPix(
 }
 
 function selecionarTipoCartao(tipo: string): void {
-  _cardTipo = tipo;
   document.getElementById('btnCredito')?.classList.toggle('ativo', tipo === 'credito');
   document.getElementById('btnDebito')?.classList.toggle('ativo', tipo === 'debito');
 }
@@ -541,7 +537,7 @@ function fecharReciboPix(): void {
   if (_pixPollTimeoutTimer) { clearTimeout(_pixPollTimeoutTimer); _pixPollTimeoutTimer = null; }
   document.getElementById('pixBackdrop')?.classList.remove('aberto');
   limparCarrinho();
-  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0; _pixNome = '';
+  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0;
   _pixItens = []; _pixEndereco = '';
   if (msgWA) window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msgWA), '_blank');
 }
@@ -569,7 +565,7 @@ function cancelarPix(): void {
   if (_pixPollTimeoutTimer) { clearTimeout(_pixPollTimeoutTimer); _pixPollTimeoutTimer = null; }
   const estaAberto = document.getElementById('pixBackdrop')?.classList.contains('aberto') ?? false;
   document.getElementById('pixBackdrop')?.classList.remove('aberto');
-  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0; _pixNome = '';
+  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0;
   _pixItens = []; _pixEndereco = '';
   if (estaAberto) abrirModal();
 }
@@ -771,7 +767,6 @@ function atualizarUIRoleta(info: Participacao | null): void {
   const wheelSection = document.getElementById('roletaWheelSection')!;
   const jaGirou = document.getElementById('roletaJaGirou')!;
   const girarBtn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
-  const clienteAtual = getClienteAtual();
 
   wheelSection.style.display = 'block';
   desenharRoleta(getPremios());

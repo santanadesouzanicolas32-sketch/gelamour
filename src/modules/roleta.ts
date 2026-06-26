@@ -1,6 +1,5 @@
 import type { RoletaConfig } from '../types';
 import { roletaRepository } from '../container';
-import { RoletaDomain } from '../domain/roleta';
 import { supabaseGet } from '../infrastructure/supabase/client';
 import { getSemanaAtual } from '../utils/format';
 import { escHTML } from '../utils/security';
@@ -49,7 +48,7 @@ export async function verificarStatus(clienteId: number): Promise<import('../dom
 }
 
 export async function girar(
-  cliente: Cliente,
+  _cliente: Cliente,
   onResultado: (premio: string, indice: number) => void
 ): Promise<void> {
   if (_girando) return;

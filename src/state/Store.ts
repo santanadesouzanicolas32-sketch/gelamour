@@ -3,7 +3,6 @@ type Listener<T> = (value: T) => void;
 
 export class Store<S extends object> {
   private state: S;
-  private listeners = new Map<string, Set<Listener<unknown>>>();
   private globalListeners = new Set<Listener<S>>();
 
   constructor(initialState: S) {

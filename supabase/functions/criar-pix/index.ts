@@ -8,15 +8,27 @@ const SUPABASE_SERVICE_KEY = Deno.env.get('GELAMOUR_SERVICE_KEY') || Deno.env.ge
 // Cliente fixo da Gelamour (CNPJ 34.695.853/0001-07)
 const GELAMOUR_CUSTOMER_ID = 'cus_000183170011'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const ALLOWED_ORIGINS = [
+  'https://santanadesouzanicolas32-sketch.github.io',
+  'http://localhost',
+  'http://127.0.0.1',
+]
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  const allowed = origin && ALLOWED_ORIGINS.some(o => origin.startsWith(o))
+    ? origin
+    : ALLOWED_ORIGINS[0]!
+  return {
+    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  }
 }
 
-const json = (data: unknown, status = 200) =>
+const json = (data: unknown, status = 200, origin: string | null = null) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
   })
 
 function sleep(ms: number): Promise<void> {
@@ -24,7 +36,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+  const origin = req.headers.get('origin')
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(origin) })
 
   try {
     const body = await req.json()
@@ -33,11 +46,11 @@ serve(async (req) => {
 
     // ── Validação de entrada ──────────────────────────────────────────
     if (!pedido_id || total == null || !nome) {
-      return json({ error: 'Dados incompletos' }, 400)
+      return json({ error: 'Dados incompletos' }, 400, origin)
     }
     const totalNum = Number(total)
     if (!isFinite(totalNum) || totalNum <= 0 || totalNum > 9_999) {
-      return json({ error: 'Valor inválido' }, 400)
+      return json({ error: 'Valor inválido' }, 400, origin)
     }
 
     // ── Verificar pedido no banco (anti-fraude: valor real do banco) ──
@@ -47,16 +60,16 @@ serve(async (req) => {
     )
     if (!pedidoResp.ok) {
       console.error('Supabase GET pedido falhou:', pedidoResp.status)
-      return json({ error: 'Erro ao verificar pedido' }, 500)
+      return json({ error: 'Erro ao verificar pedido' }, 500, origin)
     }
     const pedidos = await pedidoResp.json() as Array<{ id: number; total: number; status_pagamento: string }>
-    if (!pedidos.length) return json({ error: 'Pedido não encontrado' }, 404)
+    if (!pedidos.length) return json({ error: 'Pedido não encontrado' }, 404, origin)
 
     const pedido = pedidos[0]!
 
     // Pedido já pago — não criar nova cobrança
     if (pedido.status_pagamento === 'pago') {
-      return json({ error: 'Este pedido já foi pago' }, 409)
+      return json({ error: 'Este pedido já foi pago' }, 409, origin)
     }
 
     // Valor enviado pelo cliente deve bater com o do banco (em centavos)
@@ -64,7 +77,7 @@ serve(async (req) => {
     const totalClient = Math.round(totalNum * 100)
     if (totalDB !== totalClient) {
       console.error(`Fraude detectada — valor divergente: cliente=${totalClient} banco=${totalDB} pedido=${pedido_id}`)
-      return json({ error: 'Valor não corresponde ao pedido registrado' }, 422)
+      return json({ error: 'Valor não corresponde ao pedido registrado' }, 422, origin)
     }
 
     // ── Criar cobrança na Asaas ───────────────────────────────────────
@@ -118,12 +131,10 @@ serve(async (req) => {
     }
 
     if (!pixData.payload) {
-      // Cobrança foi criada mas QR Code não ficou disponível — retorna o ID
-      // para o cliente conseguir redirecionar para outra forma de pagamento
       return json({
         error: 'QR Code Pix temporariamente indisponível. Tente novamente em alguns instantes ou use outra forma de pagamento.',
         payment_id: charge.id,
-      }, 503)
+      }, 503, origin)
     }
 
     return json({
@@ -131,11 +142,11 @@ serve(async (req) => {
       payment_id: charge.id,
       qr_code: pixData.payload,
       qr_code_image: pixData.encodedImage ?? null,
-    })
+    }, 200, origin)
 
   } catch (e) {
     console.error('criar-pix error:', e)
-    return json({ error: e instanceof Error ? e.message : String(e) }, 500)
+    return json({ error: e instanceof Error ? e.message : String(e) }, 500, origin)
   }
 })
 

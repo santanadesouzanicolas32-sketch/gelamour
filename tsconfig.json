@@ -8,11 +8,21 @@
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "skipLibCheck": true,
     "declaration": false,
-    "sourceMap": false
+    "sourceMap": false,
+    "paths": {
+      "@core/*": ["./core/*"],
+      "@domain/*": ["./domain/*"],
+      "@app/*": ["./application/*"],
+      "@infra/*": ["./infrastructure/*"],
+      "@types/*": ["./types/*"],
+      "@utils/*": ["./utils/*"],
+      "@state/*": ["./state/*"],
+      "@modules/*": ["./modules/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "build.js"]
