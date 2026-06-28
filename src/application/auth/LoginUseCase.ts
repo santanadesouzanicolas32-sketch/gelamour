@@ -3,7 +3,6 @@ import { Cliente } from '../../domain/cliente';
 import { type Result, ok, fail, tryAsync } from '../../core/result';
 import { RateLimitError, ValidationError } from '../../core/errors';
 import { logger } from '../../core/logger';
-import { eventBus } from '../../core/events';
 import { setCliente } from '../../state/AppStore';
 
 const log = logger.child('LoginUseCase');
@@ -82,14 +81,12 @@ export class LoginUseCase {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(cliente.toJSON()));
     sessionStorage.setItem(SESSION_TS_KEY, String(Date.now()));
     setCliente(cliente);
-    eventBus.emit('auth:login', { cliente });
     log.info('Login realizado', { id: cliente.id });
   }
 
   logout(): void {
     this.clearSession();
     setCliente(null);
-    eventBus.emit('auth:logout', undefined as unknown as void);
     log.info('Logout realizado');
   }
 

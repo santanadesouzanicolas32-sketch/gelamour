@@ -1,4 +1,3 @@
-import { eventBus } from '../../core/events';
 import { setCarrinho } from '../../state/AppStore';
 import { logger } from '../../core/logger';
 import type { ItemPedido } from '../../domain/pedido';
@@ -66,6 +65,5 @@ export class CartService {
 
   private notify(): void {
     setCarrinho(this.getCount(), this.getTotal());
-    eventBus.emit('cart:updated', { count: this.getCount(), total: this.getTotal() });
   }
 }
