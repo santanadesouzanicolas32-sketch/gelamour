@@ -320,6 +320,8 @@ async function finalizarPedido(): Promise<void> {
   // Redirecionar para WhatsApp
   window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
 
+  fecharModal();
+
   if (_pedidoId) {
     appStore.setState({ pedidoIdPendente: _pedidoId });
     document.getElementById('waConfirmBackdrop')?.classList.add('aberto');
@@ -645,11 +647,8 @@ async function enviarProvasWhatsApp(): Promise<void> {
   const tel = clienteAtual.telefone || '';
   const instEl = document.getElementById('roletaInstagramInput') as HTMLInputElement | null;
   const instagram = instEl ? instEl.value.trim() : '';
-  const msg = 'Olá, equipe Gelamour! Quero participar da Roleta VIP.%0A%0ANome: ' + encodeURIComponent(nome) +
-    '%0ATelefone: ' + encodeURIComponent(tel) +
-    (instagram ? '%0AInstagram: ' + encodeURIComponent(instagram) : '') +
-    '%0A%0AEstou enviando a foto dos meus 5 adesivos e o print do Story para validação!';
-  window.open('https://wa.me/' + WA_NUMBER + '?text=' + msg, '_blank');
+  const msg = `Olá, equipe Gelamour! Quero participar da Roleta VIP.\n\nNome: ${nome}\nTelefone: ${tel}${instagram ? '\nInstagram: ' + instagram : ''}\n\nEstou enviando a foto dos meus 5 adesivos e o print do Story para validação!`;
+  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
   await registrarParticipacao(instagram);
   atualizarUIRoleta({ status: 'pendente', ja_girou: false } as Participacao);
 }
@@ -807,13 +806,13 @@ async function carregarVencedoresRoleta(): Promise<void> {
   if (!el) return;
   el.innerHTML = '<div class="roleta-empty">Carregando...</div>';
   try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_vencedores?order=data_vitoria.desc', {
+    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_vencedores?order=created_at.desc', {
       headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
     });
-    const data = await r.json() as Array<{ nome?: string; premio: string; telefone?: string; semana?: string; data_vitoria: string }>;
+    const data = await r.json() as Array<{ nome?: string; premio: string; telefone?: string; semana?: string; created_at: string }>;
     if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum vencedor ainda.</div>'; return; }
     el.innerHTML = data.map(v => {
-      const dt = new Date(v.data_vitoria).toLocaleString('pt-BR');
+      const dt = new Date(v.created_at).toLocaleString('pt-BR');
       return '<div class="roleta-vencedor-item">' +
         '<div class="roleta-vencedor-nome">🏆 ' + escHTML(v.nome ?? '—') + '</div>' +
         '<div class="roleta-vencedor-premio">🎁 ' + escHTML(v.premio) + '</div>' +

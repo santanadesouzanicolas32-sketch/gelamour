@@ -3,7 +3,6 @@ import { Pedido } from '../../domain/pedido';
 import type { PedidoProps } from '../../domain/pedido';
 import { tryAsync, type Result } from '../../core/result';
 import { supabaseFetch, supabasePatch } from './client';
-import { SUPABASE_URL, SUPABASE_ANON } from './client';
 import { NetworkError } from '../../core/errors';
 import { logger } from '../../core/logger';
 
@@ -41,15 +40,4 @@ export class PedidoRepository implements IPedidoRepository {
     });
   }
 
-  async findById(id: number): Promise<Result<Pedido | null>> {
-    return tryAsync(async () => {
-      const resp = await fetch(
-        `${SUPABASE_URL}/rest/v1/pedidos?id=eq.${id}&select=status_pagamento`,
-        { headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` } }
-      );
-      if (!resp.ok) throw new NetworkError('GET pedido falhou', { status: resp.status });
-      const rows = await resp.json() as PedidoProps[];
-      return rows[0] ? Pedido.fromDB(rows[0]) : null;
-    });
-  }
 }

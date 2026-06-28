@@ -6,8 +6,7 @@ export interface ItemPedido {
 }
 
 export type StatusPedido = 'pendente' | 'confirmado' | 'cancelado';
-export type StatusPagamento = 'aguardando' | 'pago' | 'falhou';
-export type TipoPagamento = 'Pix' | 'Dinheiro' | 'Cartão';
+export type TipoPagamento = 'Pix' | 'Dinheiro' | 'Cartão na Entrega';
 
 export interface PedidoProps {
   id?: number;
@@ -18,9 +17,7 @@ export interface PedidoProps {
   itens: ItemPedido[];
   total: number;
   status: StatusPedido;
-  status_pagamento?: StatusPagamento;
   observacao?: string;
-  asaas_payment_id?: string;
   cliente_id?: number;
 }
 
@@ -41,26 +38,6 @@ export class Pedido {
   get total(): number { return this.props.total; }
   get itens(): readonly ItemPedido[] { return this.props.itens; }
   get pagamento(): TipoPagamento { return this.props.pagamento; }
-  get statusPagamento(): StatusPagamento | undefined { return this.props.status_pagamento; }
-
-  formatarMensagemWA(waNumber: string): string {
-    const itensStr = this.props.itens.map(i =>
-      `▸ ${i.nome} — R$ ${i.preco.toFixed(2).replace('.', ',')}`
-    ).join('\n');
-    const msg = [
-      '🛍️ *NOVO PEDIDO — GELAMOUR*',
-      '',
-      itensStr,
-      '',
-      `*Total: R$ ${this.props.total.toFixed(2).replace('.', ',')}*`,
-      `*Pagamento: ${this.props.pagamento}*`,
-      '',
-      `👤 ${this.props.nome}`,
-      `📍 ${this.props.endereco}`,
-      this.props.observacao ? `📝 ${this.props.observacao}` : '',
-    ].filter(Boolean).join('\n');
-    return `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
-  }
 
   toJSON(): PedidoProps { return { ...this.props }; }
 }

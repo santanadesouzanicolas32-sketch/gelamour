@@ -21,9 +21,7 @@ export interface Pedido {
   itens: ItemCarrinho[];
   total: number;
   status: 'pendente' | 'confirmado' | 'cancelado';
-  status_pagamento?: 'aguardando' | 'pago' | 'falhou';
   observacao?: string;
-  asaas_payment_id?: string;
   cliente_id?: number;
 }
 
@@ -66,4 +64,3 @@ export interface Produto {
 }
 
 export type ToastTipo = 'erro' | 'ok' | 'info';
-export type StatusPagamento = 'aguardando' | 'pago' | 'falhou';

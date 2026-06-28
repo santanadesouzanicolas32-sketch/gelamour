@@ -9,15 +9,6 @@ export interface AppState {
   readonly carrinhoTotal: number;
   readonly pagamentoSelecionado: string;
   readonly pedidoIdPendente: number | null;
-  readonly pixData: PixData | null;
-  readonly roletaAtiva: boolean;
-}
-
-export interface PixData {
-  readonly qrCode: string;
-  readonly pixCopiaECola: string;
-  readonly asaasPaymentId: string;
-  readonly pedidoId: number;
 }
 
 const ADMIN_TEL = atob('MTE5NDA3NzI3NTA=');
@@ -39,8 +30,6 @@ export const appStore = new Store<AppState>({
   carrinhoTotal: 0,
   pagamentoSelecionado: '',
   pedidoIdPendente: null,
-  pixData: null,
-  roletaAtiva: false,
 });
 
 export function setCliente(cliente: Cliente | null): void {
@@ -57,8 +46,4 @@ export function setCarrinho(count: number, total: number): void {
 
 export function setPagamento(tipo: string): void {
   appStore.setState({ pagamentoSelecionado: tipo });
-}
-
-export function setPixData(data: PixData | null): void {
-  appStore.setState({ pixData: data });
 }
