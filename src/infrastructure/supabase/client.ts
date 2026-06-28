@@ -84,16 +84,4 @@ export async function supabasePatch<T>(
   return resp.json() as Promise<T[]>;
 }
 
-export async function callFunction<T>(name: string, body: unknown): Promise<T> {
-  const resp = await supabaseFetch(`/functions/v1/${name}`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new NetworkError(`Edge Function ${name} falhou`, { status: resp.status, body: err });
-  }
-  return resp.json() as Promise<T>;
-}
-
 export { SUPABASE_URL, SUPABASE_ANON };
