@@ -24,18 +24,6 @@ const log = logger.child('main');
 
 // ===== CONSTANTES =====
 const WA_NUMBER = atob('NTUxMTk0MDc3Mjc1MA==');
-const EDGE_URL = `${SUPABASE_URL}/functions/v1`;
-
-// ===== ESTADO LOCAL DE UI (não global — encapsulado) =====
-let _pixPayload = '';
-let _pixPollTimer: ReturnType<typeof setInterval> | null = null;
-let _pixPollTimeoutTimer: ReturnType<typeof setTimeout> | null = null; // limite 30min
-let _pixCancelled = false; // flag para evitar race condition no timer
-let _pixPedidoId: number | null = null;
-let _pixMsgWA = '';
-let _pixTotal = 0;
-let _pixItens: Array<{ nome: string; preco: number }> = [];
-let _pixEndereco = '';
 
 let _verificando = false;
 let _cadastrando = false;
@@ -237,13 +225,14 @@ function carouselPrev(id: string, e: Event): void {
   dots[prev]?.classList.add('ativo');
 }
 
-// ===== CHECKOUT / PEDIDO =====
+// ===== CHECKOUT — 100% WhatsApp =====
 async function finalizarPedido(): Promise<void> {
   const itens = cartService.getItems();
   const temFormaFin = itens.some(i => isBoloForma(i.nome));
   const temOutrosFin = itens.some(i => !isBoloForma(i.nome));
+
   if (temFormaFin && temOutrosFin) {
-    if (!confirm('⚠️ Atenção!\n\nVocê tem Bolos na Forma (feitos sob encomenda) misturados com outros produtos no carrinho.\n\nBolos na Forma precisam de prazo de 5h a 1 dia útil para preparo.\n\nDeseja prosseguir com todos os itens mesmo assim?'))
+    if (!confirm('⚠️ Atenção!\n\nVocê tem Bolos na Forma (feitos sob encomenda) misturados com outros produtos.\n\nBolos na Forma precisam de prazo de 5h a 1 dia útil para preparo.\n\nDeseja prosseguir mesmo assim?'))
       return;
   }
   if (itens.length === 0) { alert('Adicione pelo menos um produto ao carrinho!'); return; }
@@ -281,6 +270,7 @@ async function finalizarPedido(): Promise<void> {
   const txtOrig = btnFin ? (btnFin.textContent ?? '') : '';
   if (btnFin) { btnFin.disabled = true; btnFin.textContent = 'Salvando pedido...'; }
 
+  // Salvar no banco (best-effort — não bloqueia o WhatsApp)
   let _pedidoId: number | null = null;
   try {
     const ctrl = new AbortController();
@@ -306,39 +296,36 @@ async function finalizarPedido(): Promise<void> {
       signal: ctrl.signal
     });
     clearTimeout(tid);
-    if (!r.ok) {
-      const errTxt = await r.text().catch(() => '');
-      log.error('INSERT pedido falhou', { status: r.status, body: errTxt.slice(0, 120) });
-      throw new Error('HTTP ' + r.status + ' — ' + errTxt.slice(0, 120));
-    }
-    const loc = r.headers.get('Location') ?? '';
-    const idMatch = loc.match(/id=eq\.(\d+)/);
-    if (idMatch) {
-      _pedidoId = parseInt(idMatch[1]!, 10);
-      if (btnFin) btnFin.textContent = '✅ Pedido registrado!';
-      if (clienteAtual && clienteAtual.id) {
-        clienteRepository.updateEndereco(clienteAtual.id, endereco)
-          .catch((e: unknown) => log.warn('Não foi possível salvar endereço', { error: String(e) }));
+    if (r.ok) {
+      const loc = r.headers.get('Location') ?? '';
+      const idMatch = loc.match(/id=eq\.(\d+)/);
+      if (idMatch) {
+        _pedidoId = parseInt(idMatch[1]!, 10);
+        if (clienteAtual && clienteAtual.id) {
+          clienteRepository.updateEndereco(clienteAtual.id, endereco)
+            .catch((e: unknown) => log.warn('Não foi possível salvar endereço', { error: String(e) }));
+        }
       }
+    } else {
+      log.warn('INSERT pedido falhou', { status: r.status });
     }
   } catch (e) {
-    if (btnFin) btnFin.textContent = '⚠️ Erro - pedido só no WhatsApp';
-    log.warn('Erro ao salvar no banco', { error: String(e) });
+    log.warn('Erro ao salvar no banco — pedido vai só pelo WhatsApp', { error: String(e) });
   }
 
   setTimeout(() => {
     if (btnFin) { btnFin.disabled = false; btnFin.textContent = txtOrig; }
-  }, 3000);
+  }, 2000);
 
-  if ((pagamentoSelecionado === 'Pix' || pagamentoSelecionado === 'Cartão') && _pedidoId) {
-    const billingType = pagamentoSelecionado === 'Cartão' ? 'CREDIT_CARD' : 'PIX';
-    iniciarFluxoPix(_pedidoId, total, nome, msg, billingType, itensVerificados, endereco);
+  // Redirecionar para WhatsApp
+  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
+
+  if (_pedidoId) {
+    appStore.setState({ pedidoIdPendente: _pedidoId });
+    document.getElementById('waConfirmBackdrop')?.classList.add('aberto');
   } else {
-    window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
-    if (_pedidoId) {
-      appStore.setState({ pedidoIdPendente: _pedidoId });
-      document.getElementById('waConfirmBackdrop')?.classList.add('aberto');
-    }
+    // Sem ID no banco — limpa direto
+    limparCarrinho();
   }
 }
 
@@ -347,243 +334,22 @@ async function confirmarEnvioWA(): Promise<void> {
   const btn = document.querySelector('.waConfirm-sim') as HTMLButtonElement | null;
   const clienteAtual = getClienteAtual();
   if (!id) { fecharConfirmWA(); return; }
-  if (!clienteAtual || !clienteAtual.id) { fecharConfirmWA(); return; }
+  if (!clienteAtual || !clienteAtual.id) { fecharConfirmWA(); limparCarrinho(); return; }
   if (btn) { btn.textContent = 'Confirmando...'; btn.disabled = true; }
   const result = await pedidoRepository.updateStatus(id, clienteAtual.id, 'confirmado');
   if (result.ok) {
     if (btn) btn.textContent = '🎉 Pedido confirmado!';
     setTimeout(() => { fecharConfirmWA(); limparCarrinho(); }, 1800);
   } else {
-    if (btn) { btn.textContent = '✅ Sim, mensagem enviada!'; btn.disabled = false; }
     log.warn('Erro ao confirmar pedido', { error: result.error.message });
     fecharConfirmWA();
+    limparCarrinho();
   }
 }
 
 function fecharConfirmWA(): void {
   document.getElementById('waConfirmBackdrop')?.classList.remove('aberto');
   appStore.setState({ pedidoIdPendente: null });
-}
-
-// ===== FLUXO PIX =====
-async function iniciarFluxoPix(
-  pedidoId: number,
-  total: number,
-  nome: string,
-  msgWA: string,
-  billingType: string,
-  itens: Array<{ nome: string; preco: number }>,
-  endereco: string
-): Promise<void> {
-  _pixPedidoId = pedidoId;
-  _pixMsgWA = msgWA;
-  _pixTotal = total;
-  _pixItens = itens || [];
-  _pixEndereco = endereco || '';
-  const isPix = billingType !== 'CREDIT_CARD';
-
-  const pixTitulo = document.getElementById('pixTitulo');
-  const pixSub = document.getElementById('pixSub');
-  const pixValor = document.getElementById('pixValor');
-  const secaoPix = document.getElementById('secaoPix');
-  const secaoCartao = document.getElementById('secaoCartao');
-  const pixJaPagueiBtn = document.getElementById('pixJaPagueiBtn') as HTMLElement | null;
-  const pixStatus = document.getElementById('pixStatus');
-  const pixCodeBox = document.getElementById('pixCodeBox');
-  const pixQrImg = document.getElementById('pixQrImg') as HTMLImageElement | null;
-
-  if (pixTitulo) pixTitulo.textContent = isPix ? '💠 Pague via Pix' : '💳 Pague com Cartão';
-  if (pixSub) pixSub.textContent = isPix ? 'Copie o código ou escaneie o QR Code' : 'Crédito ou débito — preencha os dados abaixo';
-  if (pixValor) pixValor.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
-  if (secaoPix) secaoPix.style.display = isPix ? 'block' : 'none';
-  if (secaoCartao) secaoCartao.style.display = isPix ? 'none' : 'block';
-  if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'none';
-  if (pixStatus) { pixStatus.textContent = isPix ? '⏳ Gerando QR Code...' : ''; pixStatus.className = 'pix-status' + (isPix ? ' pix-aguardando' : ''); }
-  if (pixCodeBox) pixCodeBox.textContent = 'Gerando código...';
-  if (pixQrImg) pixQrImg.src = '';
-  document.getElementById('pixBackdrop')?.classList.add('aberto');
-  fecharModal();
-
-  if (!isPix) return;
-
-  _pixCancelled = false;
-
-  try {
-    const resp = await fetch(EDGE_URL + '/criar-pix', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
-      body: JSON.stringify({ pedido_id: pedidoId, total, nome, billing_type: 'PIX' }),
-    });
-    const data = await resp.json() as { error?: string; qr_code?: string; qr_code_image?: string | null; payment_id?: string };
-
-    if (_pixCancelled) return;
-
-    // HTTP 503 = cobrança criada mas QR não disponível — pede nova tentativa
-    if (resp.status === 503 || (data.error && data.error.includes('QR Code'))) {
-      if (pixStatus) { pixStatus.textContent = '⚠️ QR Code temporariamente indisponível. Aguarde 10s e feche para tentar novamente.'; pixStatus.className = 'pix-status'; }
-      if (pixCodeBox) pixCodeBox.textContent = 'Indisponível no momento.';
-      if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
-      log.warn('QR Code indisponível', { payment_id: data.payment_id });
-      return;
-    }
-
-    if (!resp.ok || data.error) throw new Error(data.error ?? 'HTTP ' + resp.status);
-
-    if (!data.qr_code) throw new Error('QR Code não retornado pelo servidor');
-
-    _pixPayload = data.qr_code;
-    if (pixCodeBox) pixCodeBox.textContent = _pixPayload;
-    if (data.qr_code_image && pixQrImg) pixQrImg.src = 'data:image/png;base64,' + data.qr_code_image;
-    if (pixStatus) { pixStatus.textContent = '⏳ Aguardando pagamento...'; pixStatus.className = 'pix-status pix-aguardando'; }
-
-    // Mostrar botão "Já Paguei" após 20s — fallback se detecção automática falhar
-    if (pixJaPagueiBtn) {
-      pixJaPagueiBtn.style.display = 'none';
-      setTimeout(() => {
-        if (!_pixCancelled && pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
-      }, 20_000);
-    }
-    _pixPollTimer = setInterval(verificarPagamentoPix, 4000);
-    // Timeout de 30 min — cancela polling automaticamente
-    _pixPollTimeoutTimer = setTimeout(() => {
-      if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
-      _pixPollTimeoutTimer = null;
-      if (pixStatus) { pixStatus.textContent = '⏰ Tempo esgotado. Feche e gere um novo Pix se precisar.'; pixStatus.className = 'pix-status'; }
-      if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
-    }, 30 * 60 * 1000);
-  } catch (e) {
-    if (_pixCancelled) return;
-    log.warn('Erro ao criar Pix', { error: String(e) });
-    if (pixCodeBox) pixCodeBox.textContent = 'Erro ao gerar código.';
-    if (pixStatus) { pixStatus.textContent = '⚠️ Falha ao gerar QR Code. Verifique sua conexão e tente novamente.'; pixStatus.className = 'pix-status'; }
-    if (pixJaPagueiBtn) pixJaPagueiBtn.style.display = 'block';
-  }
-}
-
-function selecionarTipoCartao(tipo: string): void {
-  document.getElementById('btnCredito')?.classList.toggle('ativo', tipo === 'credito');
-  document.getElementById('btnDebito')?.classList.toggle('ativo', tipo === 'debito');
-}
-
-function formatarCartao(el: HTMLInputElement): void {
-  let v = el.value.replace(/\D/g, '').substring(0, 16);
-  el.value = v.replace(/(.{4})(?=.)/g, '$1 ');
-}
-
-function formatarCpf(el: HTMLInputElement): void {
-  let v = el.value.replace(/\D/g, '').substring(0, 11);
-  v = v.replace(/(\d{3})(\d)/, '$1.$2');
-  v = v.replace(/(\d{3})\.(\d{3})(\d)/, '$1.$2.$3');
-  v = v.replace(/(\d{3})\.(\d{3})\.(\d{3})(\d{1,2})$/, '$1.$2.$3-$4');
-  el.value = v;
-}
-
-function formatarValidade(el: HTMLInputElement): void {
-  let v = el.value.replace(/\D/g, '').substring(0, 4);
-  if (v.length >= 3) v = v.substring(0, 2) + '/' + v.substring(2);
-  el.value = v;
-}
-
-function formatarCep(el: HTMLInputElement): void {
-  let v = el.value.replace(/\D/g, '').substring(0, 8);
-  if (v.length > 5) v = v.substring(0, 5) + '-' + v.substring(5);
-  el.value = v;
-}
-
-async function pagarCartao(): Promise<void> {
-  mostrarToast('💳 Pagamento por cartão em breve! Use o Pix por enquanto.', 'info');
-}
-
-async function verificarPagamentoPix(): Promise<void> {
-  if (!_pixPedidoId || _pixCancelled) return;
-  const result = await pedidoRepository.findById(_pixPedidoId);
-  if (result.ok && result.value) {
-    const statusPag = result.value.statusPagamento;
-    if (statusPag === 'pago') {
-      if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
-      mostrarReciboPix();
-    }
-  } else {
-    log.warn('Erro ao verificar pagamento', { error: result.ok ? 'not found' : result.error.message });
-  }
-}
-
-function mostrarReciboPix(): void {
-  const linhasItens = _pixItens.map(i =>
-    '<div class="recibo-item"><span>' + escHTML(i.nome) + '</span><span>R$ ' + Number(i.preco).toFixed(2).replace('.', ',') + '</span></div>'
-  ).join('');
-  const pixBox = document.querySelector('.pix-box');
-  if (pixBox) {
-    pixBox.innerHTML =
-      '<div style="font-size:52px;margin-bottom:8px">✅</div>' +
-      '<div style="font-size:20px;font-weight:700;color:#166534;margin-bottom:4px">Pagamento recebido!</div>' +
-      '<div style="font-size:13px;color:#6B5B52;margin-bottom:16px">Seu pedido foi confirmado com sucesso</div>' +
-      '<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px;text-align:left;margin-bottom:14px">' +
-      '<div style="font-size:11px;font-weight:700;color:#166534;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📋 Resumo do pedido</div>' +
-      linhasItens +
-      '<div style="border-top:1px solid #bbf7d0;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:700;font-size:14px">' +
-      '<span>Total</span><span style="color:#E8528A">R$ ' + Number(_pixTotal).toFixed(2).replace('.', ',') + '</span>' +
-      '</div>' +
-      '<div style="margin-top:8px;font-size:11px;color:#4b7c5e">📍 ' + escHTML(_pixEndereco) + '</div>' +
-      '</div>' +
-      '<button onclick="fecharReciboPix()" style="width:100%;padding:13px;background:linear-gradient(135deg,#E8528A,#C23A6E);color:#fff;font-weight:700;font-size:15px;border:none;border-radius:12px;cursor:pointer;font-family:inherit">💬 Ver pedido no WhatsApp</button>';
-  }
-}
-
-function fecharReciboPix(): void {
-  const msgWA = _pixMsgWA;
-  _pixCancelled = true;
-  if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
-  if (_pixPollTimeoutTimer) { clearTimeout(_pixPollTimeoutTimer); _pixPollTimeoutTimer = null; }
-  document.getElementById('pixBackdrop')?.classList.remove('aberto');
-  limparCarrinho();
-  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0;
-  _pixItens = []; _pixEndereco = '';
-  if (msgWA) window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msgWA), '_blank');
-}
-
-function copiarPix(): void {
-  if (!_pixPayload) return;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(_pixPayload).then(() => {
-      const btn = document.querySelector('.pix-copy-btn') as HTMLButtonElement | null;
-      if (btn) { btn.textContent = '✅ Código copiado!'; setTimeout(() => { btn.textContent = '📋 Copiar chave Pix'; }, 2500); }
-    });
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = _pixPayload;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-  }
-}
-
-function cancelarPix(): void {
-  _pixCancelled = true;
-  if (_pixPollTimer) { clearInterval(_pixPollTimer); _pixPollTimer = null; }
-  if (_pixPollTimeoutTimer) { clearTimeout(_pixPollTimeoutTimer); _pixPollTimeoutTimer = null; }
-  const estaAberto = document.getElementById('pixBackdrop')?.classList.contains('aberto') ?? false;
-  document.getElementById('pixBackdrop')?.classList.remove('aberto');
-  _pixPedidoId = null; _pixPayload = ''; _pixMsgWA = ''; _pixTotal = 0;
-  _pixItens = []; _pixEndereco = '';
-  if (estaAberto) abrirModal();
-}
-
-function pixJaPaguei(): void {
-  cancelarPix();
-  finalizarPedidoWhatsApp();
-}
-
-function finalizarPedidoWhatsApp(): void {
-  const itens = cartService.getItems();
-  if (itens.length === 0) { mostrarToast('Carrinho vazio', 'erro'); return; }
-  const nome = (document.getElementById('inpNome') as HTMLInputElement)?.value.trim() ?? '';
-  const endereco = (document.getElementById('inpEndereco') as HTMLTextAreaElement)?.value.trim() ?? '';
-  const total = Array.from(itens).reduce((s, i) => s + i.preco, 0);
-  const linhas = Array.from(itens).map(i => `▸ ${i.nome} — R$ ${i.preco.toFixed(2).replace('.', ',')} `).join('\n');
-  const msg = `🛒 *PEDIDO GELAMOUR* (Pix enviado manualmente)\n\n${linhas}\n\n*Total: R$ ${total.toFixed(2).replace('.', ',')}*\n\n👤 ${nome}\n📍 ${endereco}\n\n_Confirmando envio do pagamento Pix._`;
-  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
 // ===== LOGIN UI =====
@@ -1164,7 +930,6 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     fecharDialog();
     fecharModal();
     fecharConfirmWA();
-    cancelarPix();
   }
 });
 
@@ -1191,16 +956,6 @@ declare global {
     agendarBoloWhatsApp: typeof agendarBoloWhatsApp;
     carouselNext: typeof carouselNext;
     carouselPrev: typeof carouselPrev;
-    copiarPix: typeof copiarPix;
-    cancelarPix: typeof cancelarPix;
-    pixJaPaguei: typeof pixJaPaguei;
-    selecionarTipoCartao: typeof selecionarTipoCartao;
-    formatarCartao: typeof formatarCartao;
-    formatarCpf: typeof formatarCpf;
-    formatarValidade: typeof formatarValidade;
-    formatarCep: typeof formatarCep;
-    pagarCartao: typeof pagarCartao;
-    fecharReciboPix: typeof fecharReciboPix;
     mascaraTelefone: typeof mascaraTelefone;
     verificarTelefone: typeof verificarTelefone;
     cadastrar: typeof cadastrar;
@@ -1242,16 +997,6 @@ Object.assign(window, {
   agendarBoloWhatsApp,
   carouselNext,
   carouselPrev,
-  copiarPix,
-  cancelarPix,
-  pixJaPaguei,
-  selecionarTipoCartao,
-  formatarCartao,
-  formatarCpf,
-  formatarValidade,
-  formatarCep,
-  pagarCartao,
-  fecharReciboPix,
   mascaraTelefone,
   verificarTelefone,
   cadastrar,
