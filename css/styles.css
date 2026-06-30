@@ -92,24 +92,32 @@
     .filtros-wrap {
       background: #fff;
       border-bottom: 1px solid var(--borda);
-      padding: 16px 24px;
+      padding: 14px 0;
       position: sticky;
       top: 0;
       z-index: 100;
       box-shadow: 0 2px 12px rgba(74, 44, 23, 0.08);
+      overflow: hidden;
     }
 
     .filtros {
       display: flex;
       gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      justify-content: center;
-      flex-wrap: wrap;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
+      flex-wrap: nowrap;
+      width: max-content;
+      padding: 2px 16px;
+      animation: filtros-scroll 22s linear infinite;
     }
-    .filtros::-webkit-scrollbar { display: none; }
+
+    .filtros-wrap:hover .filtros,
+    .filtros-wrap:active .filtros {
+      animation-play-state: paused;
+    }
+
+    @keyframes filtros-scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
 
     .filtro-btn {
       padding: 7px 18px;
@@ -123,6 +131,7 @@
       font-family: 'DM Sans', sans-serif;
       color: var(--texto-sec);
       white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .filtro-btn:hover,
@@ -130,40 +139,6 @@
       background: var(--rosa);
       color: #fff;
       border-color: var(--rosa);
-    }
-
-    /* TICKER */
-    .ticker-wrap {
-      background: var(--rosa);
-      overflow: hidden;
-      padding: 7px 0;
-      white-space: nowrap;
-    }
-
-    .ticker-track {
-      display: inline-block;
-      animation: ticker-scroll 18s linear infinite;
-    }
-
-    .ticker-track span {
-      display: inline-block;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: 'DM Sans', sans-serif;
-      padding: 0 6px;
-      letter-spacing: 0.3px;
-    }
-
-    .ticker-dot {
-      color: rgba(255,255,255,0.5) !important;
-      font-size: 10px !important;
-      padding: 0 2px !important;
-    }
-
-    @keyframes ticker-scroll {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
     }
 
     /* GRID */
@@ -414,18 +389,6 @@
       .header p {
         font-size: 13px;
       }
-      .filtro-bar {
-        padding: 10px 0;
-      }
-      /* Filtros: quebra em linha, centralizado */
-      .filtros {
-        flex-wrap: wrap;
-        justify-content: center;
-        overflow-x: unset;
-        padding-left: 0;
-        padding-right: 0;
-        gap: 6px;
-      }
       .main {
         padding: 18px 14px calc(72px + env(safe-area-inset-bottom));
       }
@@ -440,9 +403,6 @@
       .btn-pedir,
       .btn-indisponivel {
         min-height: 44px;
-      }
-      .filtros-wrap {
-        padding: 12px 14px;
       }
       .filtro-btn {
         min-height: 36px;
