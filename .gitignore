@@ -38,3 +38,9 @@ __pycache__/
 *_temp.*
 logo_temp*
 logo_b64.txt
+
+# Pasta de staging de imagens (arquivos temporários de conversão)
+scripts/entrada/*.jpg
+scripts/entrada/*.jpeg
+scripts/entrada/*.png
+scripts/entrada/*.webp
