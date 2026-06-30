@@ -383,12 +383,14 @@
       .filtro-bar {
         padding: 10px 0;
       }
-      /* Filtros: scroll horizontal em vez de quebrar linha */
+      /* Filtros: quebra em linha, centralizado */
       .filtros {
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        padding-left: 14px;
-        padding-right: 14px;
+        flex-wrap: wrap;
+        justify-content: center;
+        overflow-x: unset;
+        padding-left: 0;
+        padding-right: 0;
+        gap: 6px;
       }
       .main {
         padding: 18px 14px calc(72px + env(safe-area-inset-bottom));
@@ -405,9 +407,13 @@
       .btn-indisponivel {
         min-height: 44px;
       }
+      .filtros-wrap {
+        padding: 12px 14px;
+      }
       .filtro-btn {
-        min-height: 40px;
-        padding: 8px 16px;
+        min-height: 36px;
+        padding: 6px 14px;
+        font-size: 12px;
       }
     }
 
