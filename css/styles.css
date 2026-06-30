@@ -411,29 +411,8 @@
       }
     }
 
-    /* iPhones SE, mini, padrão (≤ 393px): coluna única */
-    @media (max-width: 393px) {
-      .prod-grid {
-        grid-template-columns: 1fr;
-        gap: 14px;
-      }
-      .prod-info {
-        padding: 14px 16px;
-      }
-      .prod-nome {
-        font-size: 15px;
-      }
-      .prod-preco {
-        font-size: 20px;
-      }
-      .btn-pedir,
-      .btn-indisponivel {
-        font-size: 14px;
-      }
-    }
-
-    /* iPhones Plus e Pro Max (394px – 599px): 2 colunas compactas */
-    @media (min-width: 394px) and (max-width: 599px) {
+    /* Todos os celulares (≤ 599px): 2 colunas compactas */
+    @media (max-width: 599px) {
       .prod-grid {
         grid-template-columns: 1fr 1fr;
         gap: 10px;
