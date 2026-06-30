@@ -860,29 +860,40 @@ async function salvarConfigRoleta(): Promise<void> {
 // ===== INIT =====
 function initFiltrosTicker(): void {
   const wrap = document.querySelector('.filtros-wrap') as HTMLElement | null;
-  const track = document.querySelector('.filtros') as HTMLElement | null;
-  if (!wrap || !track) return;
+  if (!wrap) return;
 
-  let autoScroll = true;
-  const speed = 0.5;
+  let paused = false;
+  let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+  let direction = 1;
+  const speed = 0.7;
 
-  function tick() {
-    if (autoScroll) {
-      wrap.scrollLeft += speed;
-      if (wrap.scrollLeft >= track.offsetWidth / 2) {
-        wrap.scrollLeft = 0;
+  function pause(delay = 0): void {
+    paused = true;
+    if (resumeTimer) clearTimeout(resumeTimer);
+    if (delay > 0) {
+      resumeTimer = setTimeout(() => { paused = false; }, delay);
+    }
+  }
+
+  function tick(): void {
+    if (!paused) {
+      const maxScroll = wrap!.scrollWidth - wrap!.clientWidth;
+      if (maxScroll > 0) {
+        wrap!.scrollLeft += speed * direction;
+        if (wrap!.scrollLeft >= maxScroll) direction = -1;
+        if (wrap!.scrollLeft <= 0) direction = 1;
       }
     }
     requestAnimationFrame(tick);
   }
 
-  wrap.addEventListener('touchstart', () => { autoScroll = false; }, { passive: true });
-  wrap.addEventListener('mousedown',  () => { autoScroll = false; });
-  wrap.addEventListener('touchend',   () => { autoScroll = true; });
-  wrap.addEventListener('mouseup',    () => { autoScroll = true; });
-  wrap.addEventListener('mouseleave', () => { autoScroll = true; });
+  wrap.addEventListener('pointerdown', () => { pause(); }, { passive: true });
+  wrap.addEventListener('pointerup',   () => { pause(1200); }, { passive: true });
+  wrap.addEventListener('pointerleave',() => { pause(400); },  { passive: true });
+  wrap.addEventListener('pointercancel',() => { pause(400); }, { passive: true });
 
-  requestAnimationFrame(tick);
+  // start after layout
+  requestAnimationFrame(() => requestAnimationFrame(tick));
 }
 
 (async function init(): Promise<void> {

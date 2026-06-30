@@ -101,7 +101,9 @@
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
+      cursor: grab;
     }
+    .filtros-wrap:active { cursor: grabbing; }
     .filtros-wrap::-webkit-scrollbar { display: none; }
 
     .filtros {
