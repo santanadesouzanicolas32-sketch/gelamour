@@ -251,7 +251,7 @@ async function finalizarPedido(): Promise<void> {
   const priceMap = new Map<string, number>();
   document.querySelectorAll('.btn-pedir').forEach(btn => {
     const onclickAttr = btn.getAttribute('onclick') ?? '';
-    const m = onclickAttr.match(/pedirProduto\(this,'(.+?)',(\d+(?:\.\d+)?)\)/);
+    const m = onclickAttr.match(/pedir(?:Produto|BoloForma)\(this,'(.+?)',(\d+(?:\.\d+)?)\)/);
     if (m) priceMap.set(m[1]!, parseFloat(m[2]!));
   });
   cartService.revalidatePrices(priceMap);

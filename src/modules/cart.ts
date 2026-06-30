@@ -40,7 +40,13 @@ export function limpar(): void {
 }
 
 export function isBoloForma(nome: string): boolean {
-  const BOLO_FORMA_NOMES = ['Bolo na forma Milho natural', 'Bolo na forma Cenoura com chocolate e Granule'];
+  const BOLO_FORMA_NOMES = [
+    'Bolo na forma Milho natural',
+    'Bolo na forma Cenoura com chocolate e Granule',
+    'Bolo na forma Brigadeiro',
+    'Bolo na forma Ferrero Rocher',
+    'Torta de Frango com Catupiry',
+  ];
   return BOLO_FORMA_NOMES.includes(nome);
 }
 
