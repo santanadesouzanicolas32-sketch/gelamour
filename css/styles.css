@@ -101,22 +101,33 @@
     }
 
     .filtros {
+      display: -webkit-box;
+      display: -webkit-flex;
       display: flex;
       gap: 8px;
       flex-wrap: nowrap;
+      -webkit-flex-wrap: nowrap;
+      width: -webkit-max-content;
       width: max-content;
       padding: 2px 16px;
-      animation: filtros-scroll 22s linear infinite;
+      will-change: transform;
+      -webkit-animation: filtros-scroll 22s linear infinite;
+              animation: filtros-scroll 22s linear infinite;
     }
 
-    .filtros-wrap:hover .filtros,
-    .filtros-wrap:active .filtros {
-      animation-play-state: paused;
+    /* Pausa ao tocar/hover — funciona em desktop e mobile */
+    .filtros-wrap:hover .filtros {
+      -webkit-animation-play-state: paused;
+              animation-play-state: paused;
     }
 
+    @-webkit-keyframes filtros-scroll {
+      0%   { -webkit-transform: translateX(0);     transform: translateX(0); }
+      100% { -webkit-transform: translateX(-50%);  transform: translateX(-50%); }
+    }
     @keyframes filtros-scroll {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
+      0%   { -webkit-transform: translateX(0);     transform: translateX(0); }
+      100% { -webkit-transform: translateX(-50%);  transform: translateX(-50%); }
     }
 
     .filtro-btn {
@@ -127,11 +138,13 @@
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s;
+      -webkit-transition: all 0.2s;
+              transition: all 0.2s;
       font-family: 'DM Sans', sans-serif;
       color: var(--texto-sec);
       white-space: nowrap;
       flex-shrink: 0;
+      -webkit-flex-shrink: 0;
     }
 
     .filtro-btn:hover,
