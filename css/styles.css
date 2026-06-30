@@ -15,6 +15,12 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
@@ -22,6 +28,7 @@
       background: var(--creme);
       color: var(--texto);
       min-height: 100vh;
+      min-height: 100dvh;
     }
 
     /* HEADER */
@@ -96,10 +103,13 @@
       display: flex;
       gap: 8px;
       overflow-x: auto;
-      padding-bottom: 2px;
+      padding-bottom: 4px;
       justify-content: center;
       flex-wrap: wrap;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
     }
+    .filtros::-webkit-scrollbar { display: none; }
 
     .filtro-btn {
       padding: 7px 18px;
@@ -349,33 +359,135 @@
       color: var(--dourado);
     }
 
-    /* RESPONSIVE */
-    @media (max-width: 600px) {
+    /* ===== RESPONSIVE / iOS ===== */
+
+    /* Previne zoom automático do Safari ao focar inputs */
+    input, select, textarea, button {
+      touch-action: manipulation;
+    }
+    input, select, textarea {
+      font-size: max(16px, 1em);
+    }
+
+    /* Todos os telefones (≤ 599px) */
+    @media (max-width: 599px) {
+      .header {
+        padding: 24px 16px 32px;
+      }
       .header h1 {
-        font-size: 28px;
+        font-size: 26px;
       }
-
-      .prod-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
+      .header p {
+        font-size: 13px;
       }
-
+      .filtro-bar {
+        padding: 10px 0;
+      }
+      /* Filtros: scroll horizontal em vez de quebrar linha */
+      .filtros {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        padding-left: 14px;
+        padding-right: 14px;
+      }
       .main {
-        padding: 20px 12px 48px;
+        padding: 18px 14px calc(72px + env(safe-area-inset-bottom));
       }
-
-      .prod-nome {
+      /* FAB acima do indicador home do iPhone */
+      .cart-fab {
+        bottom: calc(16px + env(safe-area-inset-bottom));
+        right: 16px;
+        padding: 13px 20px;
         font-size: 14px;
       }
-
-      .prod-preco {
-        font-size: 18px;
+      /* Touch targets mínimos iOS (44px) */
+      .btn-pedir,
+      .btn-indisponivel {
+        min-height: 44px;
+      }
+      .filtro-btn {
+        min-height: 40px;
+        padding: 8px 16px;
       }
     }
 
-    @media (max-width: 380px) {
+    /* iPhones SE, mini, padrão (≤ 393px): coluna única */
+    @media (max-width: 393px) {
       .prod-grid {
         grid-template-columns: 1fr;
+        gap: 14px;
+      }
+      .prod-info {
+        padding: 14px 16px;
+      }
+      .prod-nome {
+        font-size: 15px;
+      }
+      .prod-preco {
+        font-size: 20px;
+      }
+      .btn-pedir,
+      .btn-indisponivel {
+        font-size: 14px;
+      }
+    }
+
+    /* iPhones Plus e Pro Max (394px – 599px): 2 colunas compactas */
+    @media (min-width: 394px) and (max-width: 599px) {
+      .prod-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .prod-info {
+        padding: 10px 10px 12px;
+      }
+      .prod-nome {
+        font-size: 13px;
+      }
+      .prod-preco {
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
+      .btn-pedir,
+      .btn-indisponivel {
+        font-size: 12px;
+        padding: 10px 4px;
+      }
+      .aviso-encomenda {
+        font-size: 10px;
+        padding: 4px 7px;
+      }
+      .prod-cat-badge {
+        font-size: 10px;
+        padding: 2px 8px;
+      }
+      .prod-desc {
+        font-size: 11px;
+      }
+    }
+
+    /* Desativa hover em dispositivos touch (evita estado preso no iOS) */
+    @media (hover: none) {
+      .prod-card:hover {
+        transform: none;
+        box-shadow: 0 2px 12px rgba(74, 44, 23, 0.08);
+      }
+      .prod-card.selecionado {
+        transform: translateY(-4px);
+      }
+      .btn-pedir:hover {
+        background: #25D366;
+        transform: none;
+        box-shadow: none;
+      }
+      .cart-fab.ativo:hover {
+        transform: translateY(0) scale(1);
+        box-shadow: 0 10px 28px rgba(232, 82, 138, 0.5);
+      }
+      .filtro-btn:hover:not(.active) {
+        background: #fff;
+        color: var(--texto-sec);
+        border-color: var(--borda);
       }
     }
 
@@ -1003,23 +1115,23 @@
     }
 
     @media (max-width: 480px) {
-      .cart-fab {
-        bottom: 18px;
-        right: 18px;
-        padding: 14px 20px;
-        font-size: 14px;
-      }
-
       .dialog-titulo {
         font-size: 19px;
       }
-
       .modal-header h2 {
         font-size: 20px;
       }
-
       .cart-item {
         padding: 12px 14px;
+      }
+      /* Modal ocupa tela inteira no iPhone, respeitando notch */
+      .modal {
+        border-radius: 20px 20px 0 0;
+        max-height: calc(92vh - env(safe-area-inset-top));
+        max-height: calc(92dvh - env(safe-area-inset-top));
+      }
+      .modal-footer {
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
       }
     }
 
@@ -1042,6 +1154,7 @@
     .carousel {
       position: absolute;
       inset: 0;
+      touch-action: pan-y;
     }
 
     .carousel-img {
