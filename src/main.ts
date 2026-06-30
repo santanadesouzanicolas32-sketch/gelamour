@@ -34,9 +34,10 @@ function getClienteAtual(): Cliente | null {
 }
 
 // ===== FILTROS =====
-function filtrar(cat: string, btn: HTMLElement): void {
+function filtrar(cat: string, _btn: HTMLElement): void {
   document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  document.querySelectorAll<HTMLElement>('.filtro-btn[data-filtro="' + cat + '"]')
+    .forEach(b => b.classList.add('active'));
   document.querySelectorAll('.prod-card').forEach(card => {
     const el = card as HTMLElement;
     if (cat === 'todos' || (el.dataset['cat'] === cat))

@@ -148,25 +148,6 @@
       margin: 0 auto;
     }
 
-    .secao-titulo {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--marrom);
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .secao-titulo::after {
-      content: '';
-      flex: 1;
-      height: 2px;
-      background: linear-gradient(90deg, var(--rosa-light), transparent);
-      border-radius: 2px;
-    }
-
     .prod-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -281,7 +262,7 @@
       border-radius: 12px;
       font-size: 14px;
       font-weight: 600;
-      cursor: pointer;
+      cursor: not-allowed;
       font-family: 'DM Sans', sans-serif;
       transition: all 0.2s;
       display: flex;
@@ -378,7 +359,7 @@
       font-size: max(16px, 1em);
     }
 
-    /* Todos os telefones (≤ 599px) */
+    /* Todos os celulares (≤ 599px) */
     @media (max-width: 599px) {
       .header {
         padding: 24px 16px 32px;
@@ -392,27 +373,12 @@
       .main {
         padding: 18px 14px calc(72px + env(safe-area-inset-bottom));
       }
-      /* FAB acima do indicador home do iPhone */
       .cart-fab {
         bottom: calc(16px + env(safe-area-inset-bottom));
         right: 16px;
         padding: 13px 20px;
         font-size: 14px;
       }
-      /* Touch targets mínimos iOS (44px) */
-      .btn-pedir,
-      .btn-indisponivel {
-        min-height: 44px;
-      }
-      .filtro-btn {
-        min-height: 36px;
-        padding: 6px 14px;
-        font-size: 12px;
-      }
-    }
-
-    /* Todos os celulares (≤ 599px): 2 colunas compactas */
-    @media (max-width: 599px) {
       .prod-grid {
         grid-template-columns: 1fr 1fr;
         gap: 10px;
@@ -429,8 +395,14 @@
       }
       .btn-pedir,
       .btn-indisponivel {
+        min-height: 44px;
         font-size: 12px;
         padding: 10px 4px;
+      }
+      .filtro-btn {
+        min-height: 36px;
+        padding: 6px 14px;
+        font-size: 12px;
       }
       .aviso-encomenda {
         font-size: 10px;
@@ -1679,11 +1651,6 @@
       align-items: center;
       gap: 16px;
       padding: 10px 0 18px;
-    }
-
-    .roleta-pointer-wrap {
-      position: relative;
-      display: inline-block;
     }
 
     /* .roleta-ponteiro removido — classe morta, HTML usa .roleta-ponteiro-fixo */

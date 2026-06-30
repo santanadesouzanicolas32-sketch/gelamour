@@ -99,23 +99,23 @@
 
   <div class="filtros-wrap">
     <div class="filtros">
-      <button class="filtro-btn active" onclick="filtrar('todos', this)">🍰 Todos</button>
-      <button class="filtro-btn" onclick="filtrar('Brownie', this)">🍫 Brownies</button>
-      <button class="filtro-btn" onclick="filtrar('Caseirinho', this)">🎂 Caseirinhos</button>
-      <button class="filtro-btn" onclick="filtrar('Mousse', this)">🍮 Mousses</button>
-      <button class="filtro-btn" onclick="filtrar('Vitamina', this)">🫐 Vitaminas</button>
-      <button class="filtro-btn" onclick="filtrar('bebidas', this)">🥤 Bebidas</button>
-      <button class="filtro-btn" onclick="filtrar('BoloForma', this)">🎂 Bolo na Forma</button>
-      <button class="filtro-btn" onclick="filtrar('Torta', this)">🥧 Tortas</button>
+      <button class="filtro-btn active" data-filtro="todos" onclick="filtrar('todos', this)">🍰 Todos</button>
+      <button class="filtro-btn" data-filtro="Brownie" onclick="filtrar('Brownie', this)">🍫 Brownies</button>
+      <button class="filtro-btn" data-filtro="Caseirinho" onclick="filtrar('Caseirinho', this)">🎂 Caseirinhos</button>
+      <button class="filtro-btn" data-filtro="Mousse" onclick="filtrar('Mousse', this)">🍮 Mousses</button>
+      <button class="filtro-btn" data-filtro="Vitamina" onclick="filtrar('Vitamina', this)">🫐 Vitaminas</button>
+      <button class="filtro-btn" data-filtro="Bebidas" onclick="filtrar('Bebidas', this)">🥤 Bebidas</button>
+      <button class="filtro-btn" data-filtro="BoloForma" onclick="filtrar('BoloForma', this)">🎂 Bolo na Forma</button>
+      <button class="filtro-btn" data-filtro="Torta" onclick="filtrar('Torta', this)">🥧 Tortas</button>
       <!-- duplicado para loop contínuo -->
-      <button class="filtro-btn" onclick="filtrar('todos', this)" aria-hidden="true">🍰 Todos</button>
-      <button class="filtro-btn" onclick="filtrar('Brownie', this)" aria-hidden="true">🍫 Brownies</button>
-      <button class="filtro-btn" onclick="filtrar('Caseirinho', this)" aria-hidden="true">🎂 Caseirinhos</button>
-      <button class="filtro-btn" onclick="filtrar('Mousse', this)" aria-hidden="true">🍮 Mousses</button>
-      <button class="filtro-btn" onclick="filtrar('Vitamina', this)" aria-hidden="true">🫐 Vitaminas</button>
-      <button class="filtro-btn" onclick="filtrar('bebidas', this)" aria-hidden="true">🥤 Bebidas</button>
-      <button class="filtro-btn" onclick="filtrar('BoloForma', this)" aria-hidden="true">🎂 Bolo na Forma</button>
-      <button class="filtro-btn" onclick="filtrar('Torta', this)" aria-hidden="true">🥧 Tortas</button>
+      <button class="filtro-btn" data-filtro="todos" onclick="filtrar('todos', this)" aria-hidden="true" tabindex="-1">🍰 Todos</button>
+      <button class="filtro-btn" data-filtro="Brownie" onclick="filtrar('Brownie', this)" aria-hidden="true" tabindex="-1">🍫 Brownies</button>
+      <button class="filtro-btn" data-filtro="Caseirinho" onclick="filtrar('Caseirinho', this)" aria-hidden="true" tabindex="-1">🎂 Caseirinhos</button>
+      <button class="filtro-btn" data-filtro="Mousse" onclick="filtrar('Mousse', this)" aria-hidden="true" tabindex="-1">🍮 Mousses</button>
+      <button class="filtro-btn" data-filtro="Vitamina" onclick="filtrar('Vitamina', this)" aria-hidden="true" tabindex="-1">🫐 Vitaminas</button>
+      <button class="filtro-btn" data-filtro="Bebidas" onclick="filtrar('Bebidas', this)" aria-hidden="true" tabindex="-1">🥤 Bebidas</button>
+      <button class="filtro-btn" data-filtro="BoloForma" onclick="filtrar('BoloForma', this)" aria-hidden="true" tabindex="-1">🎂 Bolo na Forma</button>
+      <button class="filtro-btn" data-filtro="Torta" onclick="filtrar('Torta', this)" aria-hidden="true" tabindex="-1">🥧 Tortas</button>
     </div>
   </div>
 
@@ -217,7 +217,7 @@
           <div class="check-mark">✓</div>
           <img
           src="images/products/product-07.webp"
-            alt="Caseirinho Pistache" loading="lazy">
+            alt="Caseirinho de Sensação" loading="lazy">
           <div class="prod-cat-badge">Caseirinho</div>
         </div>
         <div class="prod-info">
@@ -319,7 +319,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -327,14 +327,14 @@
           <span class="prod-cat-badge">BEBIDAS</span>
         </div>
         <div class="prod-info">
-          <div class="prod-nome">🥤Coca-Cola 200ml</div>
+          <div class="prod-nome">🥤 Coca-Cola 200ml</div>
           <div class="prod-preco">R$ 4,00</div>
           <button class="btn-pedir" onclick="pedirProduto(this,'Coca-Cola 200ml',4)"><span class="btn-txt-add">🛒
               Pedir</span><span class="btn-txt-rem">✓ Adicionado</span></button>
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -349,7 +349,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -364,7 +364,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -379,7 +379,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -394,7 +394,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -409,7 +409,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -424,7 +424,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -439,7 +439,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -454,7 +454,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -469,7 +469,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -484,7 +484,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -499,7 +499,7 @@
         </div>
       </div>
 
-      <div class="prod-card" data-cat="bebidas">
+      <div class="prod-card" data-cat="Bebidas">
         <div class="prod-img-wrap">
           <div class="check-mark">✓</div>
           <img
@@ -869,7 +869,7 @@
         </div>
 
         <!-- Seção: roda para girar (só aparece se aprovado e não girou) -->
-        <div id="roletaWheelSection" style="display:block">
+        <div id="roletaWheelSection" style="display:none">
           <div style="text-align:center;margin-bottom:10px;font-family:'Playfair Display',serif;font-size:17px;color:var(--marrom);font-weight:700">
             🎉 Você foi aprovado! Gire a roleta!
           </div>
