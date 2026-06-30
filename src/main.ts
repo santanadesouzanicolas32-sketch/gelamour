@@ -102,9 +102,9 @@ function renderizarNoticeEncomenda(): void {
   const temForma = itens.some(i => isBoloForma(i.nome));
   const temOutros = itens.some(i => !isBoloForma(i.nome));
   if (temForma && temOutros) {
-    el.innerHTML = '<div class="notice-misto"><span>⚠️</span><span><strong>Atenção:</strong> Você misturou Bolos na Forma (feitos sob encomenda) com outros produtos. Considere pedidos separados para garantir o prazo!</span></div>';
+    el.innerHTML = '<div class="notice-misto"><span>⚠️</span><span><strong>Atenção:</strong> Você misturou produtos sob encomenda com produtos prontos. Considere pedidos separados para garantir o prazo!</span></div>';
   } else if (temForma) {
-    el.innerHTML = '<div class="notice-encomenda"><span class="notice-encomenda-icon">⏰</span><span><strong>Bolo na Forma — Sob encomenda!</strong><br>Esses bolos são preparados especialmente para você. Prazo de <strong>5 horas a 1 dia útil</strong> após confirmação.</span></div>';
+    el.innerHTML = '<div class="notice-encomenda"><span class="notice-encomenda-icon">⏰</span><span><strong>Produtos sob encomenda!</strong><br>Esses produtos são preparados especialmente para você. Prazo de <strong>5 horas a 1 dia útil</strong> após confirmação.</span></div>';
   } else {
     el.innerHTML = '';
   }
@@ -189,7 +189,7 @@ function agendarBoloWhatsApp(): void {
     linhas += '• ' + i.nome + ' — R$ ' + i.preco.toFixed(2).replace('.', ',') + '\n';
     total = Math.round((total + i.preco) * 100) / 100;
   });
-  const msg = '*🎂 AGENDAMENTO - BOLO NA FORMA - GELAMOUR*\n\nOlá! Gostaria de agendar o(s) seguinte(s) bolo(s):\n\n' + linhas + '\n*💰 Total:* R$ ' + total.toFixed(2).replace('.', ',') + '\n\n⏰ Sei que o prazo é de 5 horas a 1 dia útil. Por favor me informe a data e horário disponíveis para entrega. 😊';
+  const msg = '*🎂 AGENDAMENTO - PRODUTO SOB ENCOMENDA - GELAMOUR*\n\nOlá! Gostaria de agendar o(s) seguinte(s) produto(s):\n\n' + linhas + '\n*💰 Total:* R$ ' + total.toFixed(2).replace('.', ',') + '\n\n⏰ Sei que o prazo é de 5 horas a 1 dia útil. Por favor me informe a data e horário disponíveis para entrega. 😊';
   window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
   fecharDialogBolo();
 }
@@ -232,7 +232,7 @@ async function finalizarPedido(): Promise<void> {
   const temOutrosFin = itens.some(i => !isBoloForma(i.nome));
 
   if (temFormaFin && temOutrosFin) {
-    if (!confirm('⚠️ Atenção!\n\nVocê tem Bolos na Forma (feitos sob encomenda) misturados com outros produtos.\n\nBolos na Forma precisam de prazo de 5h a 1 dia útil para preparo.\n\nDeseja prosseguir mesmo assim?'))
+    if (!confirm('⚠️ Atenção!\n\nVocê tem produtos sob encomenda misturados com produtos prontos.\n\nProdutos sob encomenda precisam de prazo de 5h a 1 dia útil para preparo.\n\nDeseja prosseguir mesmo assim?'))
       return;
   }
   if (itens.length === 0) { alert('Adicione pelo menos um produto ao carrinho!'); return; }
