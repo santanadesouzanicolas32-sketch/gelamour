@@ -858,6 +858,33 @@ async function salvarConfigRoleta(): Promise<void> {
 }
 
 // ===== INIT =====
+function initFiltrosTicker(): void {
+  const wrap = document.querySelector('.filtros-wrap') as HTMLElement | null;
+  const track = document.querySelector('.filtros') as HTMLElement | null;
+  if (!wrap || !track) return;
+
+  let autoScroll = true;
+  const speed = 0.5;
+
+  function tick() {
+    if (autoScroll) {
+      wrap.scrollLeft += speed;
+      if (wrap.scrollLeft >= track.offsetWidth / 2) {
+        wrap.scrollLeft = 0;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  wrap.addEventListener('touchstart', () => { autoScroll = false; }, { passive: true });
+  wrap.addEventListener('mousedown',  () => { autoScroll = false; });
+  wrap.addEventListener('touchend',   () => { autoScroll = true; });
+  wrap.addEventListener('mouseup',    () => { autoScroll = true; });
+  wrap.addEventListener('mouseleave', () => { autoScroll = true; });
+
+  requestAnimationFrame(tick);
+}
+
 (async function init(): Promise<void> {
   try {
     const clienteSessao = loginUseCase.restoreSession();
@@ -878,6 +905,8 @@ async function salvarConfigRoleta(): Promise<void> {
   } catch (e) { log.warn('Erro ao verificar sessão', { error: String(e) }); }
   mostrarLogin();
 })();
+
+initFiltrosTicker();
 
 // PWA service worker
 if ('serviceWorker' in navigator) {
