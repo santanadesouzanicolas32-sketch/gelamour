@@ -182,19 +182,6 @@ function fecharDialogBolo(e?: Event): void {
   }
 }
 
-function agendarBoloWhatsApp(): void {
-  const itensForma = cartService.getItems().filter(i => isBoloForma(i.nome));
-  let linhas = '';
-  let total = 0;
-  itensForma.forEach(i => {
-    linhas += '• ' + i.nome + ' — R$ ' + i.preco.toFixed(2).replace('.', ',') + '\n';
-    total = Math.round((total + i.preco) * 100) / 100;
-  });
-  const msg = '*🎂 AGENDAMENTO - BOLO NA FORMA - GELAMOUR*\n\nOlá! Gostaria de agendar o(s) seguinte(s) bolo(s):\n\n' + linhas + '\n*💰 Total:* R$ ' + total.toFixed(2).replace('.', ',') + '\n\n⏰ Sei que o prazo é de 5 horas a 1 dia útil. Por favor me informe a data e horário disponíveis para entrega. 😊';
-  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
-  fecharDialogBolo();
-}
-
 // ===== CAROUSEL =====
 function carouselNext(id: string, e: Event): void {
   if (e) e.stopPropagation();
@@ -265,7 +252,10 @@ async function finalizarPedido(): Promise<void> {
     linhasItens += `• ${item.nome} — R$ ${item.preco.toFixed(2).replace('.', ',')}\n`;
   });
 
-  const msg = `*🍰 NOVO PEDIDO - GELAMOUR*\n\n*📋 ITENS:*\n${linhasItens}\n*💰 Total:* R$ ${total.toFixed(2).replace('.', ',')}\n\n*👤 Nome:* ${nome}\n*📍 Endereço:* ${endereco}\n*💳 Pagamento:* ${pagamentoSelecionado}${obs ? `\n*📝 Obs:* ${obs}` : ''}\n\nPedido pelo cardápio online ✨`;
+  const encomendaNote = temFormaFin
+    ? '\n\n⏰ *Atenção: contém item sob encomenda — prazo de 5h a 1 dia útil para preparo.*'
+    : '';
+  const msg = `*🍰 NOVO PEDIDO - GELAMOUR*\n\n*📋 ITENS:*\n${linhasItens}\n*💰 Total:* R$ ${total.toFixed(2).replace('.', ',')}\n\n*👤 Nome:* ${nome}\n*📍 Endereço:* ${endereco}\n*💳 Pagamento:* ${pagamentoSelecionado}${obs ? `\n*📝 Obs:* ${obs}` : ''}${encomendaNote}\n\nPedido pelo cardápio online ✨`;
 
   const btnFin = document.getElementById('btnFinalizar') as HTMLButtonElement | null;
   const txtOrig = btnFin ? (btnFin.textContent ?? '') : '';
@@ -1090,7 +1080,6 @@ declare global {
     pedirBoloForma: typeof pedirBoloForma;
     abrirDialogBolo: typeof abrirDialogBolo;
     fecharDialogBolo: typeof fecharDialogBolo;
-    agendarBoloWhatsApp: typeof agendarBoloWhatsApp;
     carouselNext: typeof carouselNext;
     carouselPrev: typeof carouselPrev;
     mascaraTelefone: typeof mascaraTelefone;
@@ -1131,7 +1120,6 @@ Object.assign(window, {
   pedirBoloForma,
   abrirDialogBolo,
   fecharDialogBolo,
-  agendarBoloWhatsApp,
   carouselNext,
   carouselPrev,
   mascaraTelefone,
