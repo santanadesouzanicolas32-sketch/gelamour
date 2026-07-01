@@ -860,39 +860,136 @@ async function salvarConfigRoleta(): Promise<void> {
 // ===== INIT =====
 function initFiltrosTicker(): void {
   const wrap = document.querySelector('.filtros-wrap') as HTMLElement | null;
-  if (!wrap) return;
+  const track = document.querySelector('.filtros') as HTMLElement | null;
+  if (!wrap || !track) return;
 
-  let paused = false;
+  let pos = 0;
+  let autoDir = -1;
+  const AUTO_SPEED = 0.55;
+  let isAuto = true;
+
+  let dragging = false;
+  let dragStartClientX = 0;
+  let dragStartPos = 0;
+  let velSamples: number[] = [];
+  let prevClientX = 0;
+  let prevTime = 0;
+  let inertiaVel = 0;
+  let inertiaOn = false;
   let resumeTimer: ReturnType<typeof setTimeout> | null = null;
-  let direction = 1;
-  const speed = 0.7;
 
-  function pause(delay = 0): void {
-    paused = true;
-    if (resumeTimer) clearTimeout(resumeTimer);
-    if (delay > 0) {
-      resumeTimer = setTimeout(() => { paused = false; }, delay);
-    }
+  const getMin = (): number => Math.min(0, wrap!.clientWidth - track!.scrollWidth);
+  const getMax = (): number => 0;
+
+  function applyPos(newPos: number): void {
+    pos = newPos;
+    track!.style.transform = `translateX(${pos}px)`;
+  }
+
+  function cancelResume(): void {
+    if (resumeTimer !== null) { clearTimeout(resumeTimer); resumeTimer = null; }
+  }
+
+  function scheduleResume(ms: number): void {
+    cancelResume();
+    resumeTimer = setTimeout(() => {
+      isAuto = true;
+      inertiaOn = false;
+      inertiaVel = 0;
+      resumeTimer = null;
+    }, ms);
   }
 
   function tick(): void {
-    if (!paused) {
-      const maxScroll = wrap!.scrollWidth - wrap!.clientWidth;
-      if (maxScroll > 0) {
-        wrap!.scrollLeft += speed * direction;
-        if (wrap!.scrollLeft >= maxScroll) direction = -1;
-        if (wrap!.scrollLeft <= 0) direction = 1;
+    if (!dragging) {
+      if (inertiaOn) {
+        inertiaVel *= 0.92;
+        const min = getMin(), max = getMax();
+        const next = pos + inertiaVel;
+        if (next > max || next < min) {
+          applyPos(Math.max(min, Math.min(max, next)));
+          inertiaOn = false;
+          scheduleResume(600);
+        } else if (Math.abs(inertiaVel) < 0.15) {
+          inertiaOn = false;
+          scheduleResume(1500);
+        } else {
+          applyPos(next);
+        }
+      } else if (isAuto) {
+        const min = getMin(), max = getMax();
+        if (min < max - 1) {
+          const next = pos + AUTO_SPEED * autoDir;
+          if (next <= min) { applyPos(min); autoDir = 1; }
+          else if (next >= max) { applyPos(max); autoDir = -1; }
+          else applyPos(next);
+        }
       }
     }
     requestAnimationFrame(tick);
   }
 
-  wrap.addEventListener('pointerdown', () => { pause(); }, { passive: true });
-  wrap.addEventListener('pointerup',   () => { pause(1200); }, { passive: true });
-  wrap.addEventListener('pointerleave',() => { pause(400); },  { passive: true });
-  wrap.addEventListener('pointercancel',() => { pause(400); }, { passive: true });
+  wrap.addEventListener('pointerdown', (e: PointerEvent) => {
+    dragging = true;
+    isAuto = false;
+    inertiaOn = false;
+    inertiaVel = 0;
+    cancelResume();
+    dragStartClientX = e.clientX;
+    dragStartPos = pos;
+    velSamples = [];
+    prevClientX = e.clientX;
+    prevTime = performance.now();
+    wrap!.style.cursor = 'grabbing';
+  }, { passive: true });
 
-  // start after layout
+  wrap.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!dragging) return;
+    const dx = e.clientX - dragStartClientX;
+    const min = getMin(), max = getMax();
+    let newPos = dragStartPos + dx;
+    if (newPos > max) newPos = max + (newPos - max) * 0.25;
+    if (newPos < min) newPos = min + (newPos - min) * 0.25;
+    applyPos(newPos);
+
+    const now = performance.now();
+    const dt = now - prevTime;
+    if (dt > 0 && dt < 80) {
+      velSamples.push((e.clientX - prevClientX) * 16 / dt);
+      if (velSamples.length > 6) velSamples.shift();
+    }
+    prevClientX = e.clientX;
+    prevTime = now;
+  }, { passive: true });
+
+  const onRelease = (): void => {
+    if (!dragging) return;
+    dragging = false;
+    wrap!.style.cursor = '';
+
+    const min = getMin(), max = getMax();
+    if (pos > max || pos < min) {
+      applyPos(Math.max(min, Math.min(max, pos)));
+      scheduleResume(600);
+      return;
+    }
+
+    const avgVel = velSamples.length > 0
+      ? velSamples.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, velSamples.length)
+      : 0;
+
+    if (Math.abs(avgVel) > 0.4) {
+      inertiaVel = avgVel;
+      inertiaOn = true;
+    } else {
+      scheduleResume(2000);
+    }
+  };
+
+  wrap.addEventListener('pointerup',     onRelease, { passive: true });
+  wrap.addEventListener('pointerleave',  onRelease, { passive: true });
+  wrap.addEventListener('pointercancel', onRelease, { passive: true });
+
   requestAnimationFrame(() => requestAnimationFrame(tick));
 }
 

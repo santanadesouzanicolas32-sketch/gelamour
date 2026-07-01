@@ -97,14 +97,12 @@
       top: 0;
       z-index: 100;
       box-shadow: 0 2px 12px rgba(74, 44, 23, 0.08);
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
+      overflow: hidden;
+      touch-action: pan-y;
       cursor: grab;
+      user-select: none;
     }
     .filtros-wrap:active { cursor: grabbing; }
-    .filtros-wrap::-webkit-scrollbar { display: none; }
 
     .filtros {
       display: flex;
@@ -112,6 +110,7 @@
       flex-wrap: nowrap;
       width: max-content;
       padding: 2px 16px;
+      will-change: transform;
     }
 
     .filtro-btn {
