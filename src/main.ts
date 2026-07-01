@@ -868,12 +868,17 @@ function initFiltrosTicker(): void {
   let inertiaOn = false;
   let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const getMin = (): number => Math.min(0, wrap!.clientWidth - track!.scrollWidth);
-  const getMax = (): number => 0;
+  // Layout cache — atualizado apenas no resize, não a cada frame
+  let cachedMin = Math.min(0, wrap.clientWidth - track.scrollWidth);
+  const ro = new ResizeObserver(() => {
+    cachedMin = Math.min(0, wrap.clientWidth - track.scrollWidth);
+  });
+  ro.observe(wrap);
+  ro.observe(track);
 
   function applyPos(newPos: number): void {
     pos = newPos;
-    track!.style.transform = `translateX(${pos}px)`;
+    track.style.transform = `translateX(${pos}px)`;
   }
 
   function cancelResume(): void {
@@ -891,29 +896,30 @@ function initFiltrosTicker(): void {
   }
 
   function tick(): void {
+    // Para o loop se o elemento for removido do DOM
+    if (!document.contains(wrap)) { ro.disconnect(); return; }
+
     if (!dragging) {
       if (inertiaOn) {
         inertiaVel *= 0.92;
-        const min = getMin(), max = getMax();
         const next = pos + inertiaVel;
-        if (next > max || next < min) {
-          applyPos(Math.max(min, Math.min(max, next)));
+        if (next > 0 || next < cachedMin) {
+          applyPos(Math.max(cachedMin, Math.min(0, next)));
           inertiaOn = false;
+          inertiaVel = 0;
           scheduleResume(600);
         } else if (Math.abs(inertiaVel) < 0.15) {
           inertiaOn = false;
+          inertiaVel = 0;
           scheduleResume(1500);
         } else {
           applyPos(next);
         }
-      } else if (isAuto) {
-        const min = getMin(), max = getMax();
-        if (min < max - 1) {
-          const next = pos + AUTO_SPEED * autoDir;
-          if (next <= min) { applyPos(min); autoDir = 1; }
-          else if (next >= max) { applyPos(max); autoDir = -1; }
-          else applyPos(next);
-        }
+      } else if (isAuto && cachedMin < -1) {
+        const next = pos + AUTO_SPEED * autoDir;
+        if (next <= cachedMin) { applyPos(cachedMin); autoDir = 1; }
+        else if (next >= 0) { applyPos(0); autoDir = -1; }
+        else applyPos(next);
       }
     }
     requestAnimationFrame(tick);
@@ -930,16 +936,17 @@ function initFiltrosTicker(): void {
     velSamples = [];
     prevClientX = e.clientX;
     prevTime = performance.now();
-    wrap!.style.cursor = 'grabbing';
+    wrap.style.cursor = 'grabbing';
+    wrap.setPointerCapture(e.pointerId); // mantém eventos mesmo fora do elemento
   }, { passive: true });
 
   wrap.addEventListener('pointermove', (e: PointerEvent) => {
     if (!dragging) return;
     const dx = e.clientX - dragStartClientX;
-    const min = getMin(), max = getMax();
     let newPos = dragStartPos + dx;
-    if (newPos > max) newPos = max + (newPos - max) * 0.25;
-    if (newPos < min) newPos = min + (newPos - min) * 0.25;
+    // rubber band nas bordas
+    if (newPos > 0) newPos = newPos * 0.25;
+    if (newPos < cachedMin) newPos = cachedMin + (newPos - cachedMin) * 0.25;
     applyPos(newPos);
 
     const now = performance.now();
@@ -955,11 +962,10 @@ function initFiltrosTicker(): void {
   const onRelease = (): void => {
     if (!dragging) return;
     dragging = false;
-    wrap!.style.cursor = '';
+    wrap.style.cursor = '';
 
-    const min = getMin(), max = getMax();
-    if (pos > max || pos < min) {
-      applyPos(Math.max(min, Math.min(max, pos)));
+    if (pos > 0 || pos < cachedMin) {
+      applyPos(Math.max(cachedMin, Math.min(0, pos)));
       scheduleResume(600);
       return;
     }
@@ -976,9 +982,8 @@ function initFiltrosTicker(): void {
     }
   };
 
-  wrap.addEventListener('pointerup',     onRelease, { passive: true });
-  wrap.addEventListener('pointerleave',  onRelease, { passive: true });
-  wrap.addEventListener('pointercancel', onRelease, { passive: true });
+  wrap.addEventListener('pointerup',     onRelease);
+  wrap.addEventListener('pointercancel', onRelease);
 
   requestAnimationFrame(() => requestAnimationFrame(tick));
 }
@@ -1031,7 +1036,7 @@ if ('serviceWorker' in navigator) {
     const priceMap = new Map<string, number>();
     document.querySelectorAll('.btn-pedir').forEach(btn => {
       const onclickAttr = btn.getAttribute('onclick') ?? '';
-      const m = onclickAttr.match(/pedirProduto\(this,'(.+?)',(\d+(?:\.\d+)?)\)/);
+      const m = onclickAttr.match(/pedir(?:Produto|BoloForma)\(this,'(.+?)',(\d+(?:\.\d+)?)\)/);
       if (!m) return;
       const nomeProd = m[1]!;
       const chave = nomeProd.trim().toLowerCase();
@@ -1042,7 +1047,8 @@ if ('serviceWorker' in navigator) {
       if (db.disponivel === false) { card.style.display = 'none'; return; }
       const novoPreco = parseFloat(String(db.preco));
       if (isNaN(novoPreco) || novoPreco <= 0) return;
-      btn.setAttribute('onclick', "pedirProduto(this,'" + nomeProd.replace(/'/g, "\\'") + "'," + novoPreco + ")");
+      const fnName = onclickAttr.startsWith('pedirBoloForma') ? 'pedirBoloForma' : 'pedirProduto';
+      btn.setAttribute('onclick', fnName + "(this,'" + nomeProd.replace(/'/g, "\\'") + "'," + novoPreco + ")");
       const precoEl = card.querySelector('.prod-preco');
       if (precoEl) precoEl.textContent = 'R$ ' + novoPreco.toFixed(2).replace('.', ',');
       priceMap.set(nomeProd, novoPreco);
@@ -1057,6 +1063,7 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
     fecharDialog();
     fecharModal();
     fecharConfirmWA();
+    fecharDialogBolo();
   }
 });
 
