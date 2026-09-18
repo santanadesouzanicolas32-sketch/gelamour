@@ -369,6 +369,15 @@ function entrarComCliente(clienteRaw: Cliente): void {
   if (inpEndereco && clienteRaw.endereco) inpEndereco.value = clienteRaw.endereco;
 }
 
+function irParaEtapaCadastro(telInput: HTMLInputElement): void {
+  const etapaTel = document.getElementById('etapaTelefone');
+  const etapaCad = document.getElementById('etapaCadastro');
+  if (etapaTel) etapaTel.style.display = 'none';
+  if (etapaCad) etapaCad.style.display = 'block';
+  telInput.dataset['tel'] = telInput.value.replace(/\D/g, '');
+  document.getElementById('loginNome')?.focus();
+}
+
 async function verificarTelefone(): Promise<void> {
   if (_verificando) return;
   const telInput = document.getElementById('loginTelefone') as HTMLInputElement;
@@ -381,25 +390,23 @@ async function verificarTelefone(): Promise<void> {
     const result = await loginUseCase.execute(telInput.value);
     if (!result.ok) {
       const isUserMsg = result.error.name === 'ValidationError' || result.error.name === 'RateLimitError';
-      const msg = isUserMsg
-        ? result.error.message
-        : 'Sem conexão com o servidor. Verifique sua internet e tente novamente.';
-      log.error('verificarTelefone falhou', { error: result.error.message });
-      if (erro) { erro.textContent = msg; erro.style.display = 'block'; }
+      if (isUserMsg) {
+        if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
+        return;
+      }
+      // Banco indisponível: não bloqueia a venda — segue para o nome e entra no cardápio.
+      // O pedido sai pelo WhatsApp e não depende do banco.
+      log.warn('Servidor indisponível no login — seguindo sem cadastro', { error: result.error.message });
+      irParaEtapaCadastro(telInput);
       return;
     }
     if (result.value.existe && result.value.cliente) {
       entrarComCliente(result.value.cliente.toJSON() as Cliente);
     } else {
-      const etapaTel = document.getElementById('etapaTelefone');
-      const etapaCad = document.getElementById('etapaCadastro');
-      if (etapaTel) etapaTel.style.display = 'none';
-      if (etapaCad) etapaCad.style.display = 'block';
-      (telInput as HTMLInputElement & { dataset: DOMStringMap }).dataset['tel'] = telInput.value.replace(/\D/g, '');
-      document.getElementById('loginNome')?.focus();
+      irParaEtapaCadastro(telInput);
     }
   } catch {
-    if (erro) { erro.textContent = 'Sem conexão ou erro no servidor. Tente novamente.'; erro.style.display = 'block'; }
+    irParaEtapaCadastro(telInput);
   } finally {
     if (btn) { btn.textContent = 'Continuar →'; btn.disabled = false; }
     _verificando = false;
@@ -424,14 +431,21 @@ async function cadastrar(): Promise<void> {
   try {
     const result = await loginUseCase.register(nome, tel, '');
     if (!result.ok) {
-      const isUserMsg = result.error.name === 'ValidationError' || result.error.name === 'RateLimitError';
-      const cadastroMsg = isUserMsg ? result.error.message : 'Erro ao cadastrar. Verifique sua conexão e tente novamente.';
-      if (erro) { erro.textContent = cadastroMsg; erro.style.display = 'block'; }
+      if (result.error.name === 'ValidationError' || result.error.name === 'RateLimitError') {
+        if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
+        return;
+      }
+      log.warn('Servidor indisponível no cadastro — entrando sem salvar', { error: result.error.message });
+      entrarComCliente(ClienteEntity.create({ nome, telefone: tel, endereco: '' }).toJSON() as Cliente);
       return;
     }
     entrarComCliente(result.value.toJSON() as Cliente);
   } catch {
-    if (erro) { erro.textContent = 'Erro ao cadastrar. Verifique sua conexão e tente novamente.'; erro.style.display = 'block'; }
+    try {
+      entrarComCliente(ClienteEntity.create({ nome, telefone: tel, endereco: '' }).toJSON() as Cliente);
+    } catch {
+      if (erro) { erro.textContent = 'Confira seu nome e telefone e tente novamente.'; erro.style.display = 'block'; }
+    }
   } finally {
     if (btn) { btn.textContent = 'Entrar no cardápio ✨'; btn.disabled = false; }
     _cadastrando = false;
@@ -850,8 +864,9 @@ async function salvarConfigRoleta(): Promise<void> {
 // ===== INIT =====
 function initFiltrosTicker(): void {
   const wrap = document.querySelector('.filtros-wrap') as HTMLElement | null;
-  const track = document.querySelector('.filtros') as HTMLElement | null;
-  if (!wrap || !track) return;
+  const trackEl = document.querySelector('.filtros') as HTMLElement | null;
+  if (!wrap || !trackEl) return;
+  const track: HTMLElement = trackEl;
 
   let pos = 0;
   let autoDir = -1;
