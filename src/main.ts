@@ -263,15 +263,6 @@ function finalizarPedido(): void {
   limparCarrinho();
 }
 
-async function confirmarEnvioWA(): Promise<void> {
-  fecharConfirmWA();
-  limparCarrinho();
-}
-
-function fecharConfirmWA(): void {
-  document.getElementById('waConfirmBackdrop')?.classList.remove('aberto');
-}
-
 // ===== LOGIN UI =====
 function mascaraTelefone(el: HTMLInputElement): void {
   el.value = aplicarMascaraTelefone(el.value);
@@ -286,8 +277,6 @@ function entrarComCliente(clienteRaw: Cliente): void {
   if (usuarioBar) usuarioBar.style.display = 'inline-flex';
   const usuarioNomeEl = document.getElementById('usuarioNome');
   if (usuarioNomeEl) usuarioNomeEl.textContent = clienteRaw.nome;
-  const roletaBtn = document.getElementById('roletaBtnFlutuante') as HTMLElement | null;
-  if (roletaBtn) roletaBtn.style.display = 'flex';
   const usuarioTel = document.getElementById('usuarioTel');
   if (usuarioTel) usuarioTel.textContent = clienteRaw.telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
   const inpNome = document.getElementById('inpNome') as HTMLInputElement | null;
@@ -539,7 +528,6 @@ document.addEventListener('keydown', (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     fecharDialog();
     fecharModal();
-    fecharConfirmWA();
     fecharDialogBolo();
   }
 });
@@ -559,8 +547,6 @@ declare global {
     removerDoCarrinho: typeof removerDoCarrinho;
     selecionarPagamento: typeof selecionarPagamento;
     finalizarPedido: typeof finalizarPedido;
-    confirmarEnvioWA: typeof confirmarEnvioWA;
-    fecharConfirmWA: typeof fecharConfirmWA;
     pedirBoloForma: typeof pedirBoloForma;
     abrirDialogBolo: typeof abrirDialogBolo;
     fecharDialogBolo: typeof fecharDialogBolo;
@@ -587,8 +573,6 @@ Object.assign(window, {
   removerDoCarrinho,
   selecionarPagamento,
   finalizarPedido,
-  confirmarEnvioWA,
-  fecharConfirmWA,
   pedirBoloForma,
   abrirDialogBolo,
   fecharDialogBolo,

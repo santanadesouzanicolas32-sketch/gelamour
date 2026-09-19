@@ -59,7 +59,6 @@
 
     <!-- ETAPA 2: cadastro (só na 1ª vez) -->
     <div id="etapaCadastro" style="display:none">
-      <p style="color:#6B5B52;font-size:13px;margin-bottom:16px">Primeira vez aqui! Qual é o seu nome?</p>
       <label style="font-size:13px;font-weight:600;color:#4A2C17;text-transform:uppercase;letter-spacing:.5px">Nome completo</label>
       <input id="loginNome" type="text" placeholder="Seu nome completo" maxlength="80"
         style="width:100%;margin-top:8px;padding:14px;border:2px solid #E8E0D8;border-radius:12px;font-size:16px;outline:none;font-family:inherit"
@@ -655,22 +654,7 @@
     </div>
   </div>
 
-  <div id="waConfirmBackdrop">
-    <div class="waConfirm-box" onclick="event.stopPropagation()">
-      <div class="waConfirm-icon">💬</div>
-      <div class="waConfirm-title">Você enviou a mensagem?</div>
-      <div class="waConfirm-sub">
-        O WhatsApp foi aberto com seu pedido.<br>
-        <strong>Só confirme após enviar a mensagem</strong> para garantirmos sua venda!
-      </div>
-      <button class="waConfirm-btn waConfirm-sim" onclick="confirmarEnvioWA()">
-        ✅ Sim, mensagem enviada!
-      </button>
-      <button class="waConfirm-btn waConfirm-nao" onclick="fecharConfirmWA()">
-        Ainda não enviei
-      </button>
-    </div>
-  </div>
+  
 
   <!-- Modal de checkout -->
   <div class="modal-backdrop" id="modalBackdrop" onclick="fecharModalBackdrop(event)">
