@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const STATIC_CACHE = `gelamour-static-${CACHE_VERSION}`;
 const IMAGE_CACHE  = `gelamour-images-${CACHE_VERSION}`;
 const API_CACHE    = `gelamour-api-${CACHE_VERSION}`;
@@ -38,10 +38,6 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const { request } = event;
-  const url = new URL(request.url);
-
-  // 1. Supabase / APIs externas: network only
-  if (url.hostname.includes('supabase.co') || url.hostname.includes('asaas.com')) return;
 
   // 2. Navegacao HTML: network first, cache fallback
   if (request.mode === 'navigate') {

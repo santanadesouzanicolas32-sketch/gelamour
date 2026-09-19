@@ -1,7 +1,6 @@
-import type { IClienteRepository } from '../../repositories/IClienteRepository';
 import { Cliente } from '../../domain/cliente';
 import { type Result, ok, fail, tryAsync } from '../../core/result';
-import { RateLimitError, ValidationError } from '../../core/errors';
+import { ValidationError } from '../../core/errors';
 import { logger } from '../../core/logger';
 import { setCliente } from '../../state/AppStore';
 
@@ -9,79 +8,65 @@ const log = logger.child('LoginUseCase');
 
 const SESSION_KEY = 'gelamour_cliente';
 const SESSION_TS_KEY = 'gelamour_ts';
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-interface RateLimiter {
-  attempts: number;
-  blockedUntil: number;
+function lerStorage(chave: string): string | null {
+  try { return localStorage.getItem(chave); } catch { return null; }
 }
 
+function gravarStorage(chave: string, valor: string): void {
+  try { localStorage.setItem(chave, valor); } catch { /* modo privado: segue sem salvar */ }
+}
+
+function removerStorage(chave: string): void {
+  try { localStorage.removeItem(chave); } catch { /* ignora */ }
+}
+
+/** Login 100% local: o cadastro do cliente fica salvo no próprio aparelho. */
 export class LoginUseCase {
-  private rateLimiter: RateLimiter = { attempts: 0, blockedUntil: 0 };
-
-  constructor(private readonly clienteRepo: IClienteRepository) {}
-
-  restoreSession(): Cliente | null {
+  private lerSalvo(): Cliente | null {
     try {
-      const ts = Number(sessionStorage.getItem(SESSION_TS_KEY) ?? '0');
-      if (Date.now() - ts > SESSION_TTL_MS) {
-        this.clearSession();
-        return null;
-      }
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const ts = Number(lerStorage(SESSION_TS_KEY) ?? '0');
+      if (Date.now() - ts > SESSION_TTL_MS) return null;
+      const raw = lerStorage(SESSION_KEY);
       if (!raw) return null;
-      const data = JSON.parse(raw) as ReturnType<Cliente['toJSON']>;
-      const cliente = Cliente.fromDB(data);
-      setCliente(cliente);
-      return cliente;
+      return Cliente.fromDB(JSON.parse(raw) as ReturnType<Cliente['toJSON']>);
     } catch {
-      this.clearSession();
       return null;
     }
   }
 
+  restoreSession(): Cliente | null {
+    const cliente = this.lerSalvo();
+    if (!cliente) { this.clearSession(); return null; }
+    setCliente(cliente);
+    return cliente;
+  }
+
+  /** Telefone já usado neste aparelho entra direto; senão pede o nome. */
   async execute(telefone: string): Promise<Result<{ existe: boolean; cliente?: Cliente }>> {
-    if (Date.now() < this.rateLimiter.blockedUntil) {
-      return fail(new RateLimitError(this.rateLimiter.blockedUntil - Date.now()));
-    }
-
     const tel = telefone.replace(/\D/g, '');
-    if (tel.length < 10) return fail(new ValidationError('Telefone inválido'));
-
-    log.info('Verificando telefone', { tel: `***${tel.slice(-4)}` });
-    const result = await this.clienteRepo.findByTelefone(tel);
-
-    if (!result.ok) {
-      // NetworkError = servidor indisponível, não tentativa inválida — não penaliza
-      if (result.error.name !== 'NetworkError') {
-        this.rateLimiter.attempts++;
-        if (this.rateLimiter.attempts >= 5) {
-          this.rateLimiter.blockedUntil = Date.now() + 60_000;
-          this.rateLimiter.attempts = 0;
-          return fail(new RateLimitError(60_000));
-        }
-      }
-      return fail(result.error);
-    }
-
-    this.rateLimiter.attempts = 0;
-    return ok({ existe: !!result.value, cliente: result.value ?? undefined });
+    if (tel.length < 10 || tel.length > 11) return fail(new ValidationError('Telefone inválido'));
+    const salvo = this.lerSalvo();
+    if (salvo && salvo.telefone === tel) return ok({ existe: true, cliente: salvo });
+    return ok({ existe: false });
   }
 
   async register(nome: string, telefone: string, endereco: string): Promise<Result<Cliente>> {
-    return tryAsync(async () => {
-      const entity = Cliente.create({ nome, telefone, endereco });
-      const saved = await this.clienteRepo.save(entity);
-      if (!saved.ok) throw saved.error;
-      return saved.value;
-    });
+    return tryAsync(async () => Cliente.create({ nome, telefone, endereco }));
   }
 
   login(cliente: Cliente): void {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(cliente.toJSON()));
-    sessionStorage.setItem(SESSION_TS_KEY, String(Date.now()));
+    gravarStorage(SESSION_KEY, JSON.stringify(cliente.toJSON()));
+    gravarStorage(SESSION_TS_KEY, String(Date.now()));
     setCliente(cliente);
-    log.info('Login realizado', { id: cliente.id });
+    log.info('Login realizado');
+  }
+
+  salvarEndereco(endereco: string): void {
+    const atual = this.lerSalvo();
+    if (!atual) return;
+    gravarStorage(SESSION_KEY, JSON.stringify(atual.withEndereco(endereco).toJSON()));
   }
 
   logout(): void {
@@ -91,7 +76,7 @@ export class LoginUseCase {
   }
 
   private clearSession(): void {
-    sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem(SESSION_TS_KEY);
+    removerStorage(SESSION_KEY);
+    removerStorage(SESSION_TS_KEY);
   }
 }

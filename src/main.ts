@@ -1,26 +1,12 @@
 // src/main.ts — ponto de entrada Gelamour (Clean Architecture)
-import { mostrarToast } from './utils/toast';
 import { escHTML } from './utils/security';
 import { aplicarMascaraTelefone } from './utils/format';
-import { loginUseCase, cartService, pedidoRepository, roletaRepository, clienteRepository } from './container';
-import { appStore, isContaTeste } from './state/AppStore';
-import { logger } from './core/logger';
+import { loginUseCase, cartService, salvarEndereco } from './container';
+import { appStore } from './state/AppStore';
 import { Cliente as ClienteEntity } from './domain/cliente';
-import { getSemanaAtual } from './utils/format';
-import {
-  getPremios, getPremiosPadrao, setPremios,
-  setParticipacaoId,
-  carregarConfig as carregarConfigRoleta,
-  verificarStatus as verificarStatusRoleta,
-  girar as girarRoletaFn,
-  salvarVencedor,
-  desenharRoleta
-} from './modules/roleta';
 import { isBoloForma, renderizarLista } from './modules/cart';
-import type { Cliente, Participacao } from './types';
-import { SUPABASE_URL, SUPABASE_ANON } from './infrastructure/supabase/client';
+import type { Cliente } from './types';
 
-const log = logger.child('main');
 
 // ===== CONSTANTES =====
 const WA_NUMBER = atob('NTUxMTk0MDc3Mjc1MA==');
@@ -214,7 +200,7 @@ function carouselPrev(id: string, e: Event): void {
 }
 
 // ===== CHECKOUT — 100% WhatsApp =====
-async function finalizarPedido(): Promise<void> {
+function finalizarPedido(): void {
   const itens = cartService.getItems();
   const temFormaFin = itens.some(i => isBoloForma(i.nome));
   const temOutrosFin = itens.some(i => !isBoloForma(i.nome));
@@ -259,90 +245,31 @@ async function finalizarPedido(): Promise<void> {
 
   const btnFin = document.getElementById('btnFinalizar') as HTMLButtonElement | null;
   const txtOrig = btnFin ? (btnFin.textContent ?? '') : '';
-  if (btnFin) { btnFin.disabled = true; btnFin.textContent = 'Salvando pedido...'; }
+  if (btnFin) { btnFin.disabled = true; btnFin.textContent = 'Abrindo WhatsApp...'; }
 
-  // Salvar no banco (best-effort — não bloqueia o WhatsApp)
-  let _pedidoId: number | null = null;
-  try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10_000);
-    const r = await fetch(SUPABASE_URL + '/rest/v1/pedidos', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON,
-        'Authorization': 'Bearer ' + SUPABASE_ANON,
-        'Prefer': 'return=headers-only'
-      },
-      body: JSON.stringify({
-        nome, endereco,
-        pagamento: pagamentoSelecionado,
-        itens: itensVerificados.map(i => ({ nome: i.nome, preco: i.preco })),
-        total,
-        status: 'aguardando',
-        observacao: obs || null,
-        cliente_id: clienteAtual ? clienteAtual.id : null,
-        telefone: clienteAtual ? clienteAtual.telefone : null
-      }),
-      signal: ctrl.signal
-    });
-    clearTimeout(tid);
-    if (r.ok) {
-      const loc = r.headers.get('Location') ?? '';
-      const idMatch = loc.match(/id=eq\.(\d+)/);
-      if (idMatch) {
-        _pedidoId = parseInt(idMatch[1]!, 10);
-        if (clienteAtual && clienteAtual.id) {
-          clienteRepository.updateEndereco(clienteAtual.id, endereco)
-            .catch((e: unknown) => log.warn('Não foi possível salvar endereço', { error: String(e) }));
-        }
-      }
-    } else {
-      log.warn('INSERT pedido falhou', { status: r.status });
-    }
-  } catch (e) {
-    log.warn('Erro ao salvar no banco — pedido vai só pelo WhatsApp', { error: String(e) });
-  }
+  // Guarda o endereço no aparelho para o próximo pedido
+  if (clienteAtual) salvarEndereco(endereco);
 
   setTimeout(() => {
     if (btnFin) { btnFin.disabled = false; btnFin.textContent = txtOrig; }
   }, 2000);
 
-  // Redirecionar para WhatsApp
-  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
+  // Redirecionar para WhatsApp (se o navegador bloquear a nova aba, abre na mesma)
+  const waUrl = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
+  const win = window.open(waUrl, '_blank');
+  if (!win) { window.location.href = waUrl; return; }
 
   fecharModal();
-
-  if (_pedidoId) {
-    appStore.setState({ pedidoIdPendente: _pedidoId });
-    document.getElementById('waConfirmBackdrop')?.classList.add('aberto');
-  } else {
-    // Sem ID no banco — limpa direto
-    limparCarrinho();
-  }
+  limparCarrinho();
 }
 
 async function confirmarEnvioWA(): Promise<void> {
-  const id = appStore.getState().pedidoIdPendente;
-  const btn = document.querySelector('.waConfirm-sim') as HTMLButtonElement | null;
-  const clienteAtual = getClienteAtual();
-  if (!id) { fecharConfirmWA(); return; }
-  if (!clienteAtual || !clienteAtual.id) { fecharConfirmWA(); limparCarrinho(); return; }
-  if (btn) { btn.textContent = 'Confirmando...'; btn.disabled = true; }
-  const result = await pedidoRepository.updateStatus(id, clienteAtual.id, 'confirmado');
-  if (result.ok) {
-    if (btn) btn.textContent = '🎉 Pedido confirmado!';
-    setTimeout(() => { fecharConfirmWA(); limparCarrinho(); }, 1800);
-  } else {
-    log.warn('Erro ao confirmar pedido', { error: result.error.message });
-    fecharConfirmWA();
-    limparCarrinho();
-  }
+  fecharConfirmWA();
+  limparCarrinho();
 }
 
 function fecharConfirmWA(): void {
   document.getElementById('waConfirmBackdrop')?.classList.remove('aberto');
-  appStore.setState({ pedidoIdPendente: null });
 }
 
 // ===== LOGIN UI =====
@@ -382,22 +309,12 @@ async function verificarTelefone(): Promise<void> {
   if (_verificando) return;
   const telInput = document.getElementById('loginTelefone') as HTMLInputElement;
   const erro = document.getElementById('loginErro');
-  const btn = document.querySelector('#etapaTelefone button') as HTMLButtonElement | null;
   if (erro) erro.style.display = 'none';
-  if (btn) { btn.textContent = 'Verificando...'; btn.disabled = true; }
   _verificando = true;
   try {
     const result = await loginUseCase.execute(telInput.value);
     if (!result.ok) {
-      const isUserMsg = result.error.name === 'ValidationError' || result.error.name === 'RateLimitError';
-      if (isUserMsg) {
-        if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
-        return;
-      }
-      // Banco indisponível: não bloqueia a venda — segue para o nome e entra no cardápio.
-      // O pedido sai pelo WhatsApp e não depende do banco.
-      log.warn('Servidor indisponível no login — seguindo sem cadastro', { error: result.error.message });
-      irParaEtapaCadastro(telInput);
+      if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
       return;
     }
     if (result.value.existe && result.value.cliente) {
@@ -405,10 +322,7 @@ async function verificarTelefone(): Promise<void> {
     } else {
       irParaEtapaCadastro(telInput);
     }
-  } catch {
-    irParaEtapaCadastro(telInput);
   } finally {
-    if (btn) { btn.textContent = 'Continuar →'; btn.disabled = false; }
     _verificando = false;
   }
 }
@@ -418,36 +332,22 @@ async function cadastrar(): Promise<void> {
   const nomeInput = document.getElementById('loginNome') as HTMLInputElement;
   const telInput = document.getElementById('loginTelefone') as HTMLInputElement;
   const nome = nomeInput.value;
-  const tel = (telInput as HTMLInputElement & { dataset: DOMStringMap }).dataset['tel'] ?? '';
+  const tel = telInput.dataset['tel'] ?? telInput.value.replace(/D/g, '');
   const erro = document.getElementById('cadastroErro');
   if (!nome.trim()) {
     if (erro) { erro.textContent = 'Digite seu nome.'; erro.style.display = 'block'; }
     return;
   }
   if (erro) erro.style.display = 'none';
-  const btn = document.querySelector('#etapaCadastro button') as HTMLButtonElement | null;
-  if (btn) { btn.textContent = 'Entrando...'; btn.disabled = true; }
   _cadastrando = true;
   try {
     const result = await loginUseCase.register(nome, tel, '');
     if (!result.ok) {
-      if (result.error.name === 'ValidationError' || result.error.name === 'RateLimitError') {
-        if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
-        return;
-      }
-      log.warn('Servidor indisponível no cadastro — entrando sem salvar', { error: result.error.message });
-      entrarComCliente(ClienteEntity.create({ nome, telefone: tel, endereco: '' }).toJSON() as Cliente);
+      if (erro) { erro.textContent = result.error.message; erro.style.display = 'block'; }
       return;
     }
     entrarComCliente(result.value.toJSON() as Cliente);
-  } catch {
-    try {
-      entrarComCliente(ClienteEntity.create({ nome, telefone: tel, endereco: '' }).toJSON() as Cliente);
-    } catch {
-      if (erro) { erro.textContent = 'Confira seu nome e telefone e tente novamente.'; erro.style.display = 'block'; }
-    }
   } finally {
-    if (btn) { btn.textContent = 'Entrar no cardápio ✨'; btn.disabled = false; }
     _cadastrando = false;
   }
 }
@@ -477,388 +377,6 @@ function sair(): void {
 function mostrarLogin(): void {
   document.getElementById('loginOverlay')!.style.display = 'flex';
   setTimeout(() => (document.getElementById('loginTelefone') as HTMLInputElement)?.focus(), 300);
-}
-
-// ===== ROLETA UI =====
-async function abrirRoleta(): Promise<void> {
-  const bd = document.getElementById('roletaBackdrop');
-  if (!bd) return;
-  bd.classList.add('aberto');
-  document.body.classList.add('modal-aberto');
-  document.getElementById('roletaStatusBox')!.innerHTML = '';
-  document.getElementById('roletaInativa')!.style.display = 'none';
-  document.getElementById('roletaNaoLogado')!.style.display = 'none';
-  document.getElementById('roletaInstrucoes')!.style.display = 'block';
-  document.getElementById('roletaBtnEnviarWrap')!.style.display = 'block';
-  document.getElementById('roletaWheelSection')!.style.display = 'none';
-  document.getElementById('roletaJaGirou')!.style.display = 'none';
-  document.getElementById('roletaResultado')!.classList.remove('visivel');
-
-  const cfg = await carregarConfigRoleta();
-  const premios = getPremios();
-
-  const grid = document.getElementById('roletaPremiosGrid');
-  if (grid) {
-    const icones = ['🍫', '🧁', '🚚', '💸', '💰', '🎉', '🍮', '🎀', '🌟'];
-    grid.innerHTML = premios.map((p, i) => `<div class="roleta-premio-item">${icones[i % icones.length]} ${escHTML(p)}</div>`).join('');
-  }
-
-  if (cfg && !cfg.ativa) {
-    document.getElementById('roletaInativa')!.style.display = 'block';
-    document.getElementById('roletaInstrucoes')!.style.display = 'none';
-  }
-
-  desenharRoleta(premios);
-  document.getElementById('roletaWheelSection')!.style.display = 'block';
-
-  const clienteAtual = getClienteAtual();
-  if (!clienteAtual) {
-    document.getElementById('roletaNaoLogado')!.style.display = 'none';
-    document.getElementById('roletaInstrucoes')!.style.display = 'none';
-    const girarBtn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
-    if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
-    return;
-  }
-
-  const status = await verificarStatusRoleta(clienteAtual.id ?? 0);
-  atualizarUIRoleta(status);
-}
-
-function fecharRoleta(): void {
-  document.getElementById('roletaBackdrop')?.classList.remove('aberto');
-  document.body.classList.remove('modal-aberto');
-}
-
-function fecharRoletaBackdrop(e: Event): void {
-  if ((e.target as HTMLElement).id === 'roletaBackdrop') fecharRoleta();
-}
-
-function atualizarUIRoleta(info: Participacao | null): void {
-  const statusBox = document.getElementById('roletaStatusBox')!;
-  const instrucoes = document.getElementById('roletaInstrucoes')!;
-  const btnEnviar = document.getElementById('roletaBtnEnviarWrap')!;
-  const wheelSection = document.getElementById('roletaWheelSection')!;
-  const jaGirou = document.getElementById('roletaJaGirou')!;
-  const girarBtn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
-
-  wheelSection.style.display = 'block';
-  desenharRoleta(getPremios());
-
-  if (isContaTeste(appStore.getState().cliente)) {
-    if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
-    statusBox.innerHTML = '';
-    instrucoes.style.display = 'none';
-    btnEnviar.style.display = 'none';
-    jaGirou.style.display = 'none';
-    return;
-  }
-
-  if (!info) {
-    statusBox.innerHTML = '';
-    instrucoes.style.display = 'block';
-    btnEnviar.style.display = 'block';
-    jaGirou.style.display = 'none';
-    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; girarBtn.title = 'Envie suas provas para liberar a roleta'; }
-    return;
-  }
-
-  if (info.status === 'pendente') {
-    statusBox.innerHTML = '<div class="roleta-status-box roleta-status-pendente">⏳ <div><strong>Participação enviada!</strong><br>Suas provas estão em análise. Aguarde a aprovação (até 24h).</div></div>';
-    instrucoes.style.display = 'block'; btnEnviar.style.display = 'none'; jaGirou.style.display = 'none';
-    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; girarBtn.title = 'Aguardando aprovação'; }
-  } else if (info.status === 'rejeitado') {
-    statusBox.innerHTML = '<div class="roleta-status-box roleta-status-rejeitado">❌ <div><strong>Participação não aprovada.</strong><br>Tente novamente cumprindo todos os requisitos.</div></div>';
-    instrucoes.style.display = 'block'; btnEnviar.style.display = 'block'; jaGirou.style.display = 'none';
-    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; }
-  } else if (info.status === 'aprovado' && !info.ja_girou) {
-    const hoje = new Date().toISOString().split('T')[0];
-    const diaAprovacao = info.data_aprovacao ? info.data_aprovacao.split('T')[0] : null;
-    if (diaAprovacao !== hoje) {
-      statusBox.innerHTML = '<div class="roleta-status-box roleta-status-rejeitado">⏰ <div><strong>Prazo expirado.</strong><br>Você foi aprovado em outro dia e não girou a tempo. Envie novas provas para participar novamente.</div></div>';
-      instrucoes.style.display = 'none'; btnEnviar.style.display = 'block'; jaGirou.style.display = 'none';
-      if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; girarBtn.textContent = '🔒 Prazo expirado'; }
-    } else {
-      statusBox.innerHTML = '<div class="roleta-status-box roleta-status-aprovado">✅ <div><strong>Aprovado! Gire hoje!</strong><br>Você tem até meia-noite para usar seu giro. Não acumula!</div></div>';
-      instrucoes.style.display = 'none'; btnEnviar.style.display = 'none'; jaGirou.style.display = 'none';
-      if (girarBtn) { girarBtn.disabled = false; girarBtn.style.opacity = '1'; girarBtn.textContent = '🎡 GIRAR AGORA!'; }
-    }
-  } else if (info.ja_girou && !isContaTeste(appStore.getState().cliente)) {
-    statusBox.innerHTML = '';
-    instrucoes.style.display = 'none'; btnEnviar.style.display = 'none'; jaGirou.style.display = 'block';
-    if (girarBtn) { girarBtn.disabled = true; girarBtn.style.opacity = '0.4'; }
-    const premioEl = document.getElementById('roletaJaGirouPremio');
-    if (premioEl) {
-      premioEl.innerHTML = info.premio
-        ? 'Seu prêmio foi: <strong style="color:var(--rosa)">' + escHTML(info.premio) + '</strong>. Entre em contato conosco para resgatar!'
-        : 'Você já usou sua chance nesta campanha.';
-    }
-  }
-}
-
-async function girarRoleta(): Promise<void> {
-  const clienteAtual = getClienteAtual();
-  if (!clienteAtual) { mostrarToast('Faça login para girar a roleta!', 'erro'); return; }
-
-  const statusGiro = await verificarStatusRoleta(clienteAtual.id ?? 0);
-  if (!isContaTeste(appStore.getState().cliente)) {
-    if (!statusGiro || statusGiro.status !== 'aprovado' || statusGiro.ja_girou) {
-      mostrarToast('Você precisa ser aprovado pela equipe antes de girar!', 'erro');
-      return;
-    }
-    try {
-      const semana = getSemanaAtual();
-      const countResult = await roletaRepository.countVencedoresSemana(semana);
-      const vencedoresCount = countResult.ok ? countResult.value : 0;
-
-      const resp = await fetch(`${SUPABASE_URL}/rest/v1/roleta_config?id=eq.1&select=max_vencedores_semana`, {
-        headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-      });
-      const cfg = await resp.json() as Array<{ max_vencedores_semana: number }>;
-      const limite = cfg[0]?.max_vencedores_semana ?? 1;
-      if (vencedoresCount >= limite) {
-        const btn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
-        if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
-        const resultEl = document.getElementById('roletaResultado');
-        if (resultEl) {
-          resultEl.innerHTML = '⚠️ <strong>Já temos um ganhador esta semana!</strong><br><small>A próxima rodada começa na semana que vem. Fique de olho!</small>';
-          resultEl.classList.add('visivel');
-        }
-        return;
-      }
-    } catch (e) { log.warn('Erro ao verificar limite semanal', { error: String(e) }); }
-  }
-
-  await girarRoletaFn(clienteAtual, (premio: string) => {
-    const resultEl = document.getElementById('roletaResultado');
-    if (resultEl) {
-      resultEl.innerHTML = '🎉 Você ganhou: <strong style="color:var(--rosa)">' + escHTML(premio) + '</strong>!<br><small style="font-size:13px;color:var(--texto-sec)">Entre em contato conosco pelo WhatsApp para resgatar seu prêmio!</small>';
-      resultEl.classList.add('visivel');
-    }
-    const btn = document.getElementById('roletaGirarBtn') as HTMLButtonElement | null;
-    if (btn) btn.textContent = '✓ Girado!';
-    salvarVencedor(clienteAtual, premio).catch(console.error);
-  });
-}
-
-async function enviarProvasWhatsApp(): Promise<void> {
-  const clienteAtual = getClienteAtual();
-  if (!clienteAtual) { alert('Faça login antes de enviar suas provas.'); return; }
-  const statusAtual = await verificarStatusRoleta(clienteAtual.id ?? 0);
-  if (statusAtual && (statusAtual.status === 'pendente' || statusAtual.status === 'aprovado')) {
-    atualizarUIRoleta(statusAtual);
-    return;
-  }
-  const nome = clienteAtual.nome || '';
-  const tel = clienteAtual.telefone || '';
-  const instEl = document.getElementById('roletaInstagramInput') as HTMLInputElement | null;
-  const instagram = instEl ? instEl.value.trim() : '';
-  const msg = `Olá, equipe Gelamour! Quero participar da Roleta VIP.\n\nNome: ${nome}\nTelefone: ${tel}${instagram ? '\nInstagram: ' + instagram : ''}\n\nEstou enviando a foto dos meus 5 adesivos e o print do Story para validação!`;
-  window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg), '_blank');
-  await registrarParticipacao(instagram);
-  atualizarUIRoleta({ status: 'pendente', ja_girou: false } as Participacao);
-}
-
-async function registrarParticipacao(instagram: string): Promise<void> {
-  const clienteAtual = getClienteAtual();
-  if (!clienteAtual) return;
-  try {
-    const check = await verificarStatusRoleta(clienteAtual.id ?? 0);
-    if (check && check.status !== 'rejeitado') return;
-    const semana = getSemanaAtual();
-    const result = await roletaRepository.saveParticipacao({
-      nome: clienteAtual.nome,
-      telefone: clienteAtual.telefone,
-      instagram: instagram || undefined,
-      status: 'pendente',
-      semana,
-      ja_girou: false,
-      created_at: new Date().toISOString(),
-    } as import('./domain/roleta').ParticipacaoProps);
-    if (result.ok) {
-      setParticipacaoId(result.value.id);
-    }
-  } catch (e) { log.warn('Erro ao registrar participação', { error: String(e) }); }
-}
-
-// ===== ADMIN ROLETA =====
-function verificarAdmin(): boolean {
-  return appStore.getState().isAdmin;
-}
-
-async function abrirRoletaAdmin(): Promise<void> {
-  if (!verificarAdmin()) { alert('Acesso restrito.'); return; }
-  document.getElementById('roletaAdminBackdrop')?.classList.add('aberto');
-  await carregarParticipantesRoleta();
-  await carregarConfigAdmin();
-}
-
-function fecharRoletaAdmin(): void {
-  document.getElementById('roletaAdminBackdrop')?.classList.remove('aberto');
-}
-
-function fecharRoletaAdminBackdrop(e: Event): void {
-  if ((e.target as HTMLElement).id === 'roletaAdminBackdrop') fecharRoletaAdmin();
-}
-
-function abrirTabAdmin(tab: string, btn: HTMLElement): void {
-  document.querySelectorAll('.roleta-admin-tab').forEach(t => t.classList.remove('ativo'));
-  document.querySelectorAll('.roleta-admin-panel').forEach(p => p.classList.remove('ativo'));
-  btn.classList.add('ativo');
-  const tabId = 'tab' + tab.charAt(0).toUpperCase() + tab.slice(1);
-  document.getElementById(tabId)?.classList.add('ativo');
-  if (tab === 'pendentes') carregarParticipantesRoleta();
-  else if (tab === 'aprovados') carregarAprovadosRoleta();
-  else if (tab === 'vencedores') carregarVencedoresRoleta();
-  else if (tab === 'config') carregarConfigAdmin();
-}
-
-async function carregarParticipantesRoleta(): Promise<void> {
-  const el = document.getElementById('listaPendentes');
-  if (!el) return;
-  el.innerHTML = '<div class="roleta-empty">Carregando...</div>';
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_participacoes?status=eq.pendente&order=created_at.desc', {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-    });
-    const data = await r.json() as Array<Participacao>;
-    if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum participante pendente.</div>'; return; }
-    el.innerHTML = data.map(p => {
-      const dt = new Date(p.created_at).toLocaleString('pt-BR');
-      return '<div class="roleta-participante-item">' +
-        '<div class="roleta-participante-info">' +
-        '<div class="roleta-participante-nome">' + escHTML(p.nome ?? '') + '</div>' +
-        '<div class="roleta-participante-tel">' + escHTML(p.telefone) + (p.instagram ? ' · @' + escHTML(p.instagram) : '') + '</div>' +
-        '<div style="font-size:11px;color:#999">' + dt + '</div>' +
-        '</div>' +
-        '<div class="roleta-participante-acoes">' +
-        '<button class="btn-aprovar" onclick="aprovarParticipante(' + p.id + ', this)">✓ Aprovar</button>' +
-        '<button class="btn-rejeitar" onclick="rejeitarParticipante(' + p.id + ', this)">✗ Rejeitar</button>' +
-        '</div></div>';
-    }).join('');
-  } catch { el.innerHTML = '<div class="roleta-empty">Erro ao carregar.</div>'; }
-}
-
-async function carregarAprovadosRoleta(): Promise<void> {
-  const el = document.getElementById('listaAprovados');
-  if (!el) return;
-  el.innerHTML = '<div class="roleta-empty">Carregando...</div>';
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_participacoes?status=eq.aprovado&order=data_aprovacao.desc', {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-    });
-    const data = await r.json() as Array<Participacao>;
-    if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum aprovado ainda.</div>'; return; }
-    el.innerHTML = data.map(p => {
-      const dt = p.data_aprovacao ? new Date(p.data_aprovacao).toLocaleString('pt-BR') : '—';
-      const girou = p.ja_girou ? '✓ Girou — ' + escHTML(p.premio ?? '') : '⏳ Aguardando girar';
-      return '<div class="roleta-participante-item">' +
-        '<div class="roleta-participante-info">' +
-        '<div class="roleta-participante-nome">' + escHTML(p.nome ?? '') + '</div>' +
-        '<div class="roleta-participante-tel">' + escHTML(p.telefone) + '</div>' +
-        '<div style="font-size:11px;color:#388e3c">' + girou + '</div>' +
-        '<div style="font-size:11px;color:#999">Aprovado em: ' + dt + '</div>' +
-        '</div></div>';
-    }).join('');
-  } catch { el.innerHTML = '<div class="roleta-empty">Erro ao carregar.</div>'; }
-}
-
-async function aprovarParticipante(id: number, btn: HTMLButtonElement): Promise<void> {
-  btn.disabled = true; btn.textContent = '...';
-  const clienteAtual = getClienteAtual();
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_participacoes?id=eq.' + id, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json', 'apikey': SUPABASE_ANON,
-        'Authorization': 'Bearer ' + SUPABASE_ANON, 'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({
-        status: 'aprovado',
-        data_aprovacao: new Date().toISOString(),
-        aprovado_por: clienteAtual ? clienteAtual.nome : 'admin'
-      })
-    });
-    if (!r.ok) throw new Error('status ' + r.status);
-    btn.closest('.roleta-participante-item')?.remove();
-  } catch {
-    btn.disabled = false; btn.textContent = '✓ Aprovar';
-    alert('Erro ao aprovar.');
-  }
-}
-
-async function rejeitarParticipante(id: number, btn: HTMLButtonElement): Promise<void> {
-  if (!confirm('Rejeitar esta participação?')) return;
-  btn.disabled = true; btn.textContent = '...';
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_participacoes?id=eq.' + id, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json', 'apikey': SUPABASE_ANON,
-        'Authorization': 'Bearer ' + SUPABASE_ANON, 'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ status: 'rejeitado' })
-    });
-    if (!r.ok) throw new Error('status ' + r.status);
-    btn.closest('.roleta-participante-item')?.remove();
-  } catch {
-    btn.disabled = false; btn.textContent = '✗ Rejeitar';
-    alert('Erro ao rejeitar.');
-  }
-}
-
-async function carregarVencedoresRoleta(): Promise<void> {
-  const el = document.getElementById('listaVencedores');
-  if (!el) return;
-  el.innerHTML = '<div class="roleta-empty">Carregando...</div>';
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_vencedores?order=created_at.desc', {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-    });
-    const data = await r.json() as Array<{ nome?: string; premio: string; telefone?: string; semana?: string; created_at: string }>;
-    if (!data || !data.length) { el.innerHTML = '<div class="roleta-empty">Nenhum vencedor ainda.</div>'; return; }
-    el.innerHTML = data.map(v => {
-      const dt = new Date(v.created_at).toLocaleString('pt-BR');
-      return '<div class="roleta-vencedor-item">' +
-        '<div class="roleta-vencedor-nome">🏆 ' + escHTML(v.nome ?? '—') + '</div>' +
-        '<div class="roleta-vencedor-premio">🎁 ' + escHTML(v.premio) + '</div>' +
-        '<div class="roleta-vencedor-data">' + escHTML(v.telefone ?? '') + ' · Semana ' + escHTML(v.semana ?? '') + ' · ' + dt + '</div>' +
-        '</div>';
-    }).join('');
-  } catch { el.innerHTML = '<div class="roleta-empty">Erro ao carregar.</div>'; }
-}
-
-async function carregarConfigAdmin(): Promise<void> {
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_config?id=eq.1&limit=1', {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON }
-    });
-    const data = await r.json() as Array<{ ativa: boolean; premios: string[] }>;
-    if (data && data[0]) {
-      (document.getElementById('configAtiva') as HTMLInputElement).checked = data[0]!.ativa;
-      const premios = Array.isArray(data[0]!.premios) ? data[0]!.premios : getPremiosPadrao();
-      (document.getElementById('configPremios') as HTMLTextAreaElement).value = premios.join('\n');
-    }
-  } catch (e) { log.warn('Erro ao carregar config admin', { error: String(e) }); }
-}
-
-async function salvarConfigRoleta(): Promise<void> {
-  const ativa = (document.getElementById('configAtiva') as HTMLInputElement).checked;
-  const premiosTxt = (document.getElementById('configPremios') as HTMLTextAreaElement).value;
-  const premios = premiosTxt.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-  const msgEl = document.getElementById('configMsg') as HTMLElement | null;
-  try {
-    const r = await fetch(SUPABASE_URL + '/rest/v1/roleta_config?id=eq.1', {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json', 'apikey': SUPABASE_ANON,
-        'Authorization': 'Bearer ' + SUPABASE_ANON, 'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ ativa, premios, updated_at: new Date().toISOString() })
-    });
-    if (!r.ok) throw new Error('status ' + r.status);
-    setPremios(premios);
-    if (msgEl) { msgEl.style.display = 'block'; setTimeout(() => { msgEl.style.display = 'none'; }, 2500); }
-  } catch { alert('Erro ao salvar configurações.'); }
 }
 
 // ===== INIT =====
@@ -1003,24 +521,9 @@ function initFiltrosTicker(): void {
   requestAnimationFrame(() => requestAnimationFrame(tick));
 }
 
-(async function init(): Promise<void> {
-  try {
-    const clienteSessao = loginUseCase.restoreSession();
-    if (clienteSessao) {
-      const result = await loginUseCase.execute(clienteSessao.telefone);
-      if (result.ok && result.value.existe && result.value.cliente) {
-        entrarComCliente(result.value.cliente.toJSON() as Cliente);
-        return;
-      }
-      // Falha de rede → confia na sessão local em vez de fazer logout
-      if (!result.ok && result.error.name === 'NetworkError') {
-        log.warn('Revalidação offline — usando sessão local', { tel: `***${clienteSessao.telefone.slice(-4)}` });
-        entrarComCliente(clienteSessao.toJSON() as Cliente);
-        return;
-      }
-      loginUseCase.logout();
-    }
-  } catch (e) { log.warn('Erro ao verificar sessão', { error: String(e) }); }
+(function init(): void {
+  const clienteSessao = loginUseCase.restoreSession();
+  if (clienteSessao) { entrarComCliente(clienteSessao.toJSON() as Cliente); return; }
   mostrarLogin();
 })();
 
@@ -1030,47 +533,6 @@ initFiltrosTicker();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
-
-// Sincronizar cardápio com Supabase
-(async function sincronizarCardapio(): Promise<void> {
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 10_000);
-    const r = await fetch(SUPABASE_URL + '/rest/v1/produtos?select=nome,preco,disponivel', {
-      headers: { 'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + SUPABASE_ANON },
-      signal: ctrl.signal
-    });
-    clearTimeout(timer);
-    if (!r.ok) return;
-    const prods = await r.json() as Array<{ nome: string; preco: number; disponivel: boolean }>;
-    if (!Array.isArray(prods) || !prods.length) return;
-    const mapa: Record<string, { nome: string; preco: number; disponivel: boolean }> = {};
-    prods.forEach(p => {
-      if (p && typeof p.nome === 'string' && p.nome.trim()) mapa[p.nome.trim().toLowerCase()] = p;
-    });
-    const priceMap = new Map<string, number>();
-    document.querySelectorAll('.btn-pedir').forEach(btn => {
-      const onclickAttr = btn.getAttribute('onclick') ?? '';
-      const m = onclickAttr.match(/pedir(?:Produto|BoloForma)\(this,'(.+?)',(\d+(?:\.\d+)?)\)/);
-      if (!m) return;
-      const nomeProd = m[1]!;
-      const chave = nomeProd.trim().toLowerCase();
-      const db = mapa[chave];
-      if (!db) return;
-      const card = btn.closest('.prod-card') as HTMLElement | null;
-      if (!card) return;
-      if (db.disponivel === false) { card.style.display = 'none'; return; }
-      const novoPreco = parseFloat(String(db.preco));
-      if (isNaN(novoPreco) || novoPreco <= 0) return;
-      const fnName = onclickAttr.startsWith('pedirBoloForma') ? 'pedirBoloForma' : 'pedirProduto';
-      btn.setAttribute('onclick', fnName + "(this,'" + nomeProd.replace(/'/g, "\\'") + "'," + novoPreco + ")");
-      const precoEl = card.querySelector('.prod-preco');
-      if (precoEl) precoEl.textContent = 'R$ ' + novoPreco.toFixed(2).replace('.', ',');
-      priceMap.set(nomeProd, novoPreco);
-    });
-    cartService.revalidatePrices(priceMap);
-  } catch { /* silencioso */ }
-})();
 
 // Fechar modais com Escape
 document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -1109,18 +571,6 @@ declare global {
     cadastrar: typeof cadastrar;
     voltarEtapaTelefone: typeof voltarEtapaTelefone;
     sair: typeof sair;
-    abrirRoleta: typeof abrirRoleta;
-    fecharRoleta: typeof fecharRoleta;
-    fecharRoletaBackdrop: typeof fecharRoletaBackdrop;
-    girarRoleta: typeof girarRoleta;
-    enviarProvasWhatsApp: typeof enviarProvasWhatsApp;
-    abrirRoletaAdmin: typeof abrirRoletaAdmin;
-    fecharRoletaAdmin: typeof fecharRoletaAdmin;
-    fecharRoletaAdminBackdrop: typeof fecharRoletaAdminBackdrop;
-    abrirTabAdmin: typeof abrirTabAdmin;
-    aprovarParticipante: typeof aprovarParticipante;
-    rejeitarParticipante: typeof rejeitarParticipante;
-    salvarConfigRoleta: typeof salvarConfigRoleta;
   }
 }
 
@@ -1149,16 +599,4 @@ Object.assign(window, {
   cadastrar,
   voltarEtapaTelefone,
   sair,
-  abrirRoleta,
-  fecharRoleta,
-  fecharRoletaBackdrop,
-  girarRoleta,
-  enviarProvasWhatsApp,
-  abrirRoletaAdmin,
-  fecharRoletaAdmin,
-  fecharRoletaAdminBackdrop,
-  abrirTabAdmin,
-  aprovarParticipante,
-  rejeitarParticipante,
-  salvarConfigRoleta,
 });
